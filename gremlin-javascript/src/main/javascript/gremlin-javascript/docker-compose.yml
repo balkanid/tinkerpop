@@ -45,26 +45,24 @@ services:
     container_name: gremlin-js-integration-tests
     image: node:${NODE_VERSION:-20}
     volumes:
-      - .:/js_app
       - ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/test/features:/gremlin-test
-      - ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/structure/io/graphbinary:/js_app/gremlin-test/graphbinary
-      - ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/language/translator:/js_app/gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/language/translator
-      - ../../../../../docker/gremlin-test-server:/js_app/gremlin-test-server
-      - ../../../../../gremlin-tools/gremlin-socket-server/conf:/js_app/gremlin-socket-server/conf/
+      - ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/structure/io/graphbinary:/workspace/gremlin-javascript/src/main/javascript/gremlin-javascript/gremlin-test/graphbinary
+      - ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/language/translator:/workspace/gremlin-javascript/src/main/javascript/gremlin-javascript/gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/language/translator
+      - ../../../../../docker/gremlin-test-server:/workspace/gremlin-javascript/src/main/javascript/gremlin-javascript/gremlin-test-server
+      - ../../../../../gremlin-tools/gremlin-socket-server/conf:/workspace/gremlin-javascript/src/main/javascript/gremlin-javascript/gremlin-socket-server/conf/
       - ../../../../../gremlin-language/src/main/antlr4:/gremlin-language/src/main/antlr4
-      - ../../../..:/gremlin-javascript
+      - ../../../../..:/workspace
     environment:
       - DOCKER_ENVIRONMENT=true
       - GREMLIN_SERVER_URL=http://gremlin-server-test-js:45940/gremlin
       - VERTEX_LABEL=javascript-example
-      - IO_TEST_DIRECTORY=/js_app/gremlin-test/graphbinary/
-    working_dir: /js_app
+      - IO_TEST_DIRECTORY=/workspace/gremlin-javascript/src/main/javascript/gremlin-javascript/gremlin-test/graphbinary/
+    working_dir: /workspace/gremlin-javascript/src/main/javascript/gremlin-javascript
     command: >
       bash -c "npm config set cache /tmp --global
-      && npm ci && npm run test && npm run features-docker 
+      && npm ci && npm run test && npm run features-docker
       && echo 'Running examples'
-      && cd /gremlin-javascript/src/main/javascript/gremlin-javascript && npm ci
-      && cd /gremlin-javascript/examples/node && npm ci
+      && cd /workspace/gremlin-javascript/examples/node
       && node basic-gremlin.js
       && node connections.js
       && node modern-traversals.js

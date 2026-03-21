@@ -3,15 +3,6 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "gremlin": [
-        "../../../../gremlin-javascript/src/main/javascript/gremlin-javascript/build/esm/index.d.ts"
-      ],
-      "gremlin/language": [
-        "../../../../gremlin-javascript/src/main/javascript/gremlin-javascript/build/esm/language/index.d.ts"
-      ]
-    },
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",

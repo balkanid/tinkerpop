@@ -19,10 +19,12 @@
   "license": "Apache-2.0",
   "type": "module",
   "main": "./build/cjs/index.cjs",
+  "types": "./build/esm/index.d.ts",
   "exports": {
     ".": {
       "import": "./build/esm/index.js",
-      "require": "./build/cjs/index.cjs"
+      "require": "./build/cjs/index.cjs",
+      "types": "./build/esm/index.d.ts"
     },
     "./language": {
       "import": "./build/esm/language/index.js",

@@ -287,6 +287,7 @@ limitations under the License.
                             <excludes>
                                 <exclude>gremlin-dotnet/src/obj/**</exclude>
                                 <exclude>gremlin-dotnet/src/_site/**</exclude>
+                                <exclude>node_modules/**</exclude>
                                 <exclude>gremlin-javascript/src/main/javascript/gremlin-javascript/node_modules/**</exclude>
                                 <exclude>gremlin-javascript/src/main/javascript/gremlin-javascript/.idea/**</exclude>
                                 <exclude>gremlin-python/src/main/python-reports/**</exclude>
@@ -302,6 +303,42 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
+            </plugin>
+            <!--
+            Install node/npm and run npm ci from the workspace root so that all JS workspace
+            members (gremlin-javascript, gremlin-mcp, gremlint) share a single node_modules
+            installation with workspace symlinks in place before any child module builds.
+            The root pom runs first in the Maven reactor, ensuring this completes before
+            any child module begins its own build lifecycle.
+            -->
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>1.15.0</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>install node and npm</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>npm workspace install</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>ci</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <nodeVersion>${runtime.node.version}</nodeVersion>
+                    <npmVersion>${runtime.npm.version}</npmVersion>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

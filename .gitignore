@@ -50,3 +50,7 @@ CLAUDE.md
 **/.claude/
 .beads/
 gremlin-python/src/main/python/build/
+node_modules/
+node/
+.dolt/
+*.db

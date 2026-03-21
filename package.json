@@ -1,0 +1,9 @@
+{
+  "name": "apache-tinkerpop",
+  "private": true,
+  "workspaces": [
+    "gremlin-javascript/src/main/javascript/gremlin-javascript",
+    "gremlin-mcp/src/main/javascript",
+    "gremlint"
+  ]
+}
