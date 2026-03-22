@@ -32,8 +32,14 @@
     "readable-stream": "^4.5.2",
     "uuid": "^9.0.1"
   },
+  "optionalDependencies": {
+    "@aws-sdk/credential-providers": "^3.967.0",
+    "@smithy/hash-node": "^4.2.12",
+    "@smithy/signature-v4": "^5.3.12"
+  },
   "devDependencies": {
     "@cucumber/cucumber": "~12.7.0",
+    "@eslint/js": "^9.16.0",
     "@knighted/duel": "^1.0.7",
     "@tsconfig/node18": "^18.2.2",
     "@types/readable-stream": "^4.0.10",
@@ -42,13 +48,12 @@
     "chai-string": "~1.5.0",
     "colors": "1.4.0",
     "cross-env": "^10.1.0",
-    "@eslint/js": "^9.16.0",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.0.0",
     "globals": "^15.14.0",
-    "jsdoc": "^4.0.5",
     "js-yaml": "^3.14.2",
+    "jsdoc": "^4.0.5",
     "mocha": "^11.7.5",
     "prettier": "^3.0.0",
     "ts-node": "^10.9.2",
