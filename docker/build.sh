@@ -156,7 +156,7 @@ if [ -n "${INCLUDE_DOTNET}" ] && [ -n "${RUN_TESTS}" ]; then
 fi
 
 if [ -n "${INCLUDE_JAVASCRIPT}" ] && [ -n "${RUN_TESTS}" ]; then
-  pushd ${ABS_PROJECT_HOME}/gremlin-javascript/src/main/javascript/gremlin-javascript > /dev/null
+  pushd ${ABS_PROJECT_HOME}/gremlin-js/gremlin-javascript > /dev/null
   docker compose up --build --exit-code-from gremlin-js-integration-tests
   check_status "down"
 fi

@@ -58,7 +58,7 @@ mkdir -p "dotnetdocs/${VERSION}"
 
 mkdir -p ../jsdocs
 rm -rf ../jsdocs/*
-cp -R ../../gremlin-javascript/src/main/javascript/gremlin-javascript/doc/ ../jsdocs/
+cp -R ../../gremlin-js/gremlin-javascript/doc/ ../jsdocs/
 
 mkdir -p ../dotnetdocs
 rm -rf ../dotnetdocs/*

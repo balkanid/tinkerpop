@@ -328,7 +328,7 @@ launched with `npx` as follows:
 [source,text]
 ----
 # from the root of the repository
-$ npx @modelcontextprotocol/inspector node gremlin-mcp/src/main/javascript/dist/server.js -e GREMLIN_MCP_ENDPOINT=localhost:8182/g -e GREMLIN_MCP_LOG_LEVEL=info
+$ npx @modelcontextprotocol/inspector node gremlin-js/gremlin-mcp/dist/server.js -e GREMLIN_MCP_ENDPOINT=localhost:8182/g -e GREMLIN_MCP_LOG_LEVEL=info
 ----
 
 IMPORTANT: Beware of unexpected or unwanted changes on `package-lock.json` files when committing and merging.
@@ -534,7 +534,7 @@ mvn -Dmaven.javadoc.skip=true --projects tinkergraph-gremlin test
 ** Process a single AsciiDoc file: +pass:[docs/preprocessor/preprocess-file.sh `pwd`/gremlin-console/target/apache-tinkerpop-gremlin-console-*-standalone "" "*" `pwd`/docs/src/xyz.asciidoc]+
 * Build JavaDocs/JSDoc: `mvn process-resources -Djavadoc`
 ** Javadoc to `target/site/apidocs` directory
-** JSDoc to the `gremlin-javascript/src/main/javascript/gremlin-javascript/doc/` directory
+** JSDoc to the `gremlin-js/gremlin-javascript/doc/` directory
 * Specify the seed used for `Random` in tests `mvn clean install -DtestSeed` - useful when a test fails, the seed will be printed in the build output so that the test can run with the same version of random (look for "TestHelper" logger in output)
 * Check for newer dependencies: `mvn versions:display-dependency-updates` or `mvn versions:display-plugin-updates`
 * Check the effective `pom.xml`: `mvn -pl gremlin-python -Pglv-python help:effective-pom -Doutput=withProfilePom.xml`

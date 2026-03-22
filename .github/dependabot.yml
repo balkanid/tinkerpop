@@ -23,7 +23,7 @@ updates:
       - update-types: [ "version-update:semver-patch", "version-update:semver-minor" ]
         dependency-name: "*"
   - package-ecosystem: "npm"
-    directory: "/gremlin-javascript/src/main/javascript/gremlin-javascript"
+    directory: "/gremlin-js/gremlin-javascript"
     schedule:
       interval: "monthly"
     target-branch: "master"
@@ -34,7 +34,7 @@ updates:
       - update-types: ["version-update:semver-patch", "version-update:semver-minor"]
         dependency-name: "*"
   - package-ecosystem: "npm"
-    directory: "/gremlint"
+    directory: "/gremlin-js/gremlint"
     schedule:
       interval: "monthly"
     target-branch: "master"
@@ -56,7 +56,7 @@ updates:
       - update-types: [ "version-update:semver-patch", "version-update:semver-minor" ]
         dependency-name: "*"
   - package-ecosystem: "npm"
-    directory: "/gremlin-mcp/src/main/javascript"
+    directory: "/gremlin-js/gremlin-mcp"
     schedule:
       interval: "monthly"
     target-branch: "master"

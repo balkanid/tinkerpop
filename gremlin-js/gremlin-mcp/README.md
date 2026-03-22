@@ -82,7 +82,7 @@ in canonical gremlin-language ANTLR format.
 ```bash
 # Clone and setup
 git clone https://github.com/apache/tinkerpop.git
-cd tinkerpop/gremlin-mcp/src/main/javascript
+cd tinkerpop/gremlin-js/gremlin-mcp
 npm install
 npm run build
 ```
@@ -434,7 +434,7 @@ _The following sections are for developers who want to contribute to or modify t
 ```bash
 # Clone and install
 git clone https://github.com/apache/tinkerpop.git
-cd tinkerpop/gremlin-mcp/src/main/javascript
+cd tinkerpop/gremlin-js/gremlin-mcp
 npm install
 
 # Development with hot reload

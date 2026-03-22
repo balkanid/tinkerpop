@@ -20,11 +20,12 @@ limitations under the License.
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.tinkerpop</groupId>
-        <artifactId>tinkerpop</artifactId>
+        <artifactId>gremlin-js</artifactId>
         <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>gremlin-javascript</artifactId>
-    <name>Apache TinkerPop :: Gremlin Javascript</name>
+    <artifactId>gremlint</artifactId>
+    <name>Apache TinkerPop :: Gremlint</name>
     <properties>
         <maven.test.skip>false</maven.test.skip>
         <skipTests>${maven.test.skip}</skipTests>
@@ -45,32 +46,11 @@ limitations under the License.
             <plugin>
                 <!--
                 Use gmavenplus-plugin to:
-                    - Generate js sources
+                    - Update version number
                 -->
                 <groupId>org.codehaus.gmavenplus</groupId>
                 <artifactId>gmavenplus-plugin</artifactId>
                 <dependencies>
-                    <dependency>
-                        <groupId>org.apache.tinkerpop</groupId>
-                        <artifactId>gremlin-server</artifactId>
-                        <version>${project.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.apache.tinkerpop</groupId>
-                        <artifactId>gremlin-test</artifactId>
-                        <version>${project.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>commons-io</groupId>
-                        <artifactId>commons-io</artifactId>
-                        <version>${commons.io.version}</version>
-                    </dependency>
-					<dependency>
-						<groupId>ch.qos.logback</groupId>
-						<artifactId>logback-classic</artifactId>
-						<version>${logback.version}</version>
-						<scope>runtime</scope>
-					</dependency>
                     <dependency>
                         <groupId>org.apache.groovy</groupId>
                         <artifactId>groovy-all</artifactId>
@@ -81,7 +61,7 @@ limitations under the License.
                 </dependencies>
                 <executions>
                     <execution>
-                        <id>generate-radish-support</id>
+                        <id>update-version</id>
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>execute</goal>
@@ -90,27 +70,18 @@ limitations under the License.
                             <properties>
                                 <property>
                                     <name>projectBaseDir</name>
-                                    <value>${project.basedir}/../</value>
+                                    <value>${project.basedir}</value>
+                                </property>
+                                <property>
+                                    <name>mavenVersion</name>
+                                    <value>${project.version}</value>
                                 </property>
                             </properties>
                             <scripts>
-                                <script>${project.basedir}/build/generate.groovy</script>
-                            </scripts>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>update-version</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>execute</goal>
-                        </goals>
-                        <configuration>
-                            <scripts>
                                 <script>
-                                    def mavenVersion = "${project.version}"
                                     def versionForJs = mavenVersion.replace("-SNAPSHOT", "-alpha1")
-                                    def platformAgnosticBaseDirPath = project.basedir.getAbsolutePath().replace("\\", "/")
-                                    def file = new File(platformAgnosticBaseDirPath + "/src/main/javascript/gremlin-javascript/package.json")
+                                    def platformAgnosticBaseDirPath = project.basedir.getAbsolutePath().replace("\\","/")
+                                    def file = new File(platformAgnosticBaseDirPath + "/package.json")
                                     file.write(file.getText("UTF-8").replaceFirst(/"version": "(.*)",/, "\"version\": \"" + versionForJs + "\","))
                                 </script>
                             </scripts>
@@ -128,13 +99,6 @@ limitations under the License.
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
-                    <filesets>
-                        <fileset>
-                            <directory>src/main/javascript/gremlin-javascript/build</directory>
-                        </fileset>
-                    </filesets>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.github.eirslett</groupId>
@@ -163,36 +127,25 @@ limitations under the License.
                     </execution>
                     <execution>
                         <id>install node and npm</id>
-                        <phase>validate</phase>
+                        <phase>generate-resources</phase>
                         <goals>
                             <goal>install-node-and-npm</goal>
                         </goals>
                     </execution>
                     <execution>
-                        <id>npm lint</id>
-                        <phase>validate</phase>
+                        <id>npm test</id>
+                        <phase>test</phase>
                         <goals>
                             <goal>npm</goal>
                         </goals>
                         <configuration>
                             <skip>${skipTests}</skip>
-                            <arguments>run lint</arguments>
+                            <arguments>test --exit</arguments>
                             <failOnError>true</failOnError>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm jsdoc</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>generate-resources</phase>
-                        <configuration>
-                            <arguments>run doc</arguments>
                         </configuration>
                     </execution>
                 </executions>
                 <configuration>
-                    <workingDirectory>src/main/javascript/gremlin-javascript</workingDirectory>
                     <nodeVersion>${runtime.node.version}</nodeVersion>
                     <npmVersion>${runtime.npm.version}</npmVersion>
                 </configuration>
@@ -228,110 +181,17 @@ limitations under the License.
                     <skip>true</skip>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>com.google.code.maven-replacer-plugin</groupId>
-                <artifactId>replacer</artifactId>
-                <configuration>
-                    <file>src/main/javascript/gremlin-javascript/lib/utils.ts</file>
-                    <replacements>
-                        <replacement>
-                            <token>gremlinVersion = '.*'</token>
-                            <value>gremlinVersion = '${project.version}'</value>
-                        </replacement>
-                    </replacements>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
     <profiles>
-        <!-- Test gremlin-javascript in Docker -->
-        <profile>
-            <id>glv-js</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <build>
-                <finalName>${project.artifactId}-${project.version}</finalName>
-                <plugins>
-                    <plugin>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <version>3.5.0</version>
-                        <executions>
-                            <execution>
-                                <id>run-tests</id>
-                                <phase>integration-test</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <skip>${skipTests}</skip>
-                                    <environmentVariables>
-                                        <GREMLIN_SERVER>${project.version}</GREMLIN_SERVER>
-                                        <ABS_PROJECT_HOME>${project.basedir}/../</ABS_PROJECT_HOME>
-                                        <!-- setting this env variable is needed to be cross-platform compatible -->
-                                        <HOME>${user.home}</HOME>
-                                        <NODE_VERSION>${node.test.version}</NODE_VERSION>
-                                    </environmentVariables>
-                                    <executable>docker</executable>
-                                    <arguments>
-                                        <argument>compose</argument>
-                                        <argument>up</argument>
-                                        <argument>--build</argument>
-                                        <argument>--exit-code-from</argument>
-                                        <argument>gremlin-js-integration-tests</argument>
-                                    </arguments>
-                                    <workingDirectory>./src/main/javascript/gremlin-javascript</workingDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>shutdown-container</id>
-                                <phase>integration-test</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <skip>${skipTests}</skip>
-                                    <!-- don't need to set env variables for container tear down -->
-                                    <executable>docker</executable>
-                                    <arguments>
-                                        <argument>compose</argument>
-                                        <argument>down</argument>
-                                    </arguments>
-                                    <workingDirectory>./src/main/javascript/gremlin-javascript</workingDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>remove-dangling-images</id>
-                                <phase>integration-test</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <skip>${skipTests}</skip>
-                                    <executable>docker</executable>
-                                    <arguments>
-                                        <argument>image</argument>
-                                        <argument>prune</argument>
-                                        <argument>--filter</argument>
-                                        <argument>label=maintainer=dev@tinkerpop.apache.org</argument>
-                                        <argument>-f</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
         <!--
-        Provides a way to deploy the gremlin-javascript GLV to npm. This cannot be part of the standard maven execution
+        Provides a way to deploy gremlint to npm. This cannot be part of the standard maven execution
         because npm does not have a staging environment like sonatype for releases. As soon as the release is
         published it is public. In our release workflow, deploy occurs prior to vote on the release and we can't
         make this stuff public until the vote is over.
         -->
         <profile>
-            <id>glv-javascript-deploy</id>
+            <id>gremlint-deploy</id>
             <activation>
                 <activeByDefault>false</activeByDefault>
                 <property>
@@ -362,7 +222,6 @@ limitations under the License.
                             activated and that should be good enough given our deployment process.
                             -->
                             <skip>false</skip>
-                            <workingDirectory>src/main/javascript/gremlin-javascript</workingDirectory>
                             <nodeVersion>${runtime.node.version}</nodeVersion>
                             <npmVersion>${runtime.npm.version}</npmVersion>
                         </configuration>

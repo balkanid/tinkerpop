@@ -35,7 +35,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const grammarPath = join(
   __dirname,
-  '../../../../../gremlin-language/src/main/antlr4/Gremlin.g4'
+  '../../../gremlin-language/src/main/antlr4/Gremlin.g4'
 );
 const outputPath = join(__dirname, '../src/translator/stepNames.ts');
 

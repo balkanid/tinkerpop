@@ -134,6 +134,7 @@ export default [
   {
     ignores: [
       "build/**/*",
+      "examples/**/*",
       "test/**/*.js",
       "doc/**/*.js",
       "node_modules/**/*",

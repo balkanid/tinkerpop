@@ -36,23 +36,18 @@
 
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Use createRequire so Node resolves antlr4ng through the normal module
+// resolution algorithm, which handles npm workspace hoisting correctly.
+const require = createRequire(import.meta.url);
 
-// Locate antlr4ng — handle workspace hoisting (package may live in a parent node_modules)
-let pkgDir = resolve(__dirname, '..', 'node_modules', 'antlr4ng');
-if (!existsSync(pkgDir)) {
-  pkgDir = resolve(__dirname, '..', '..', '..', 'node_modules', 'antlr4ng');
-}
-if (!existsSync(pkgDir)) {
-  console.warn(
-    '\n[patch-antlr4ng] WARNING: antlr4ng not found in node_modules. ' +
-      'TypeScript CJS type resolution may be broken. ' +
-      'Expected path: ' +
-      resolve(__dirname, '..', 'node_modules', 'antlr4ng') +
-      '\n',
-  );
+let pkgDir;
+try {
+  // Resolve antlr4ng's main entry, then walk up to the package root.
+  pkgDir = resolve(dirname(require.resolve('antlr4ng')), '..');
+} catch {
+  console.warn('\n[patch-antlr4ng] WARNING: antlr4ng not found. TypeScript CJS type resolution may be broken.\n');
   process.exit(0); // non-fatal: let the build surface its own errors
 }
 

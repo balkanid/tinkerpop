@@ -78,7 +78,7 @@
     "url": "https://issues.apache.org/jira/browse/TINKERPOP"
   },
   "scripts": {
-    "generate": "mkdir -p lib/language/grammar && antlr-ng -Dlanguage=TypeScript -visitor --generate-listener --exact-output-dir -o lib/language/grammar ../../../../../gremlin-language/src/main/antlr4/Gremlin.g4",
+    "generate": "mkdir -p lib/language/grammar && antlr-ng -Dlanguage=TypeScript -visitor --generate-listener --exact-output-dir -o lib/language/grammar ../../gremlin-language/src/main/antlr4/Gremlin.g4",
     "prebuild": "node scripts/patch-antlr4ng.js && npm run generate",
     "_prebuild_note": "patch-antlr4ng.js is a build-time stop-gap for antlr4ng missing .d.cts CJS type declarations (antlr4ng issues #23/#26). antlr4ng is pinned to an exact version in dependencies. Before upgrading antlr4ng, verify the patch still applies or that upstream has fixed the issue.",
     "build": "rm -rf build && duel --dirs",
@@ -86,10 +86,10 @@
     "test": "npm run unit-test && npm run integration-test",
     "unit-test": "cross-env TS_NODE_PROJECT='tsconfig.test.json' mocha 'test/unit/**/*.{js,ts}'",
     "integration-test": "npm run integration-test-graphbinary",
-    "integration-test-graphbinary": "cross-env TS_NODE_PROJECT='tsconfig.test.json' CLIENT_MIMETYPE='application/vnd.graphbinary-v4.0' ./node_modules/mocha/bin/mocha.js test/integration -t 5000",
+    "integration-test-graphbinary": "cross-env TS_NODE_PROJECT='tsconfig.test.json' CLIENT_MIMETYPE='application/vnd.graphbinary-v4.0' mocha test/integration -t 5000",
     "TODO": "# test other mime types like graphbinary stringd",
     "features": "npm run features-graphbinary",
-    "features-graphbinary": "cross-env NODE_OPTIONS='--loader ts-node/esm' TS_NODE_PROJECT='tsconfig.test.json' CLIENT_MIMETYPE='application/vnd.graphbinary-v4.0' cucumber-js --tags \"not @DataBigDecimal and not @DataBigInt and not @DataUUID and not @DataLong and not @StepWrite\" --import test/cucumber ../../../../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/test/features/",
+    "features-graphbinary": "cross-env NODE_OPTIONS='--loader ts-node/esm' TS_NODE_PROJECT='tsconfig.test.json' CLIENT_MIMETYPE='application/vnd.graphbinary-v4.0' cucumber-js --tags \"not @DataBigDecimal and not @DataBigInt and not @DataUUID and not @DataLong and not @StepWrite\" --import test/cucumber ../../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/test/features/",
     "features-docker": "npm run features-graphbinary-docker",
     "features-graphbinary-docker": "cross-env NODE_OPTIONS='--loader ts-node/esm' TS_NODE_PROJECT='tsconfig.test.json' CLIENT_MIMETYPE='application/vnd.graphbinary-v4.0' cucumber-js --tags \"not @DataBigDecimal and not @DataBigInt and not @DataUUID and not @DataLong and not @StepWrite\" --import test/cucumber ../gremlin-test/",
     "lint": "eslint --ext .js .",

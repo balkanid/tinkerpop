@@ -60,9 +60,9 @@ python3 gremlin-python/src/main/python/examples/basic_gremlin.py
 
 echo
 echo "Running JavaScript examples:"
-npm install --prefix gremlin-javascript/examples
-node gremlin-javascript/examples/connections.js
-node gremlin-javascript/examples/basic-gremlin.js
+npm install --prefix gremlin-js/gremlin-javascript/examples
+node gremlin-js/gremlin-javascript/examples/connections.js
+node gremlin-js/gremlin-javascript/examples/basic-gremlin.js
 
 echo
 echo "Running .NET examples:"
@@ -101,8 +101,8 @@ python3 gremlin-python/src/main/python/examples/modern_traversals.py
 
 echo
 echo "Running JavaScript traversals:"
-npm install --prefix gremlin-javascript/examples
-node gremlin-javascript/examples/modern-traversals.js
+npm install --prefix gremlin-js/gremlin-javascript/examples
+node gremlin-js/gremlin-javascript/examples/modern-traversals.js
 
 echo
 echo "Running .NET traversals:"

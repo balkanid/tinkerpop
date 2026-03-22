@@ -155,7 +155,7 @@ else
   echo "OK"
 fi
 echo -n "* building project ... "
-touch {gremlin-dotnet,gremlin-dotnet/src,gremlin-dotnet/test,gremlin-python,gremlin-javascript,gremlin-go}/.glv
+touch {gremlin-dotnet,gremlin-dotnet/src,gremlin-dotnet/test,gremlin-python,gremlin-js/gremlin-javascript,gremlin-go}/.glv
 LOG_FILE="${TMP_DIR}/mvn-clean-install-${VERSION}.log"
 mvn clean install -q > "${LOG_FILE}" 2>&1 || {
   echo "failed"

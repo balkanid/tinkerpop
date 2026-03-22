@@ -52,5 +52,7 @@ CLAUDE.md
 gremlin-python/src/main/python/build/
 node_modules/
 node/
+gremlin-js/node_modules/
+gremlin-js/node/
 .dolt/
 *.db

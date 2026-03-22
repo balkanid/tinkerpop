@@ -23,7 +23,7 @@ let formatQuery: (q: string, opts?: any) => string;
 
 beforeAll(async () => {
   // Import the compiled gremlint artifact directly from the repository (lib/index.js)
-  const mod = await import('../../../../../gremlint/lib/index.js');
+  const mod = await import('../../gremlint/lib/index.js');
   // Resolve across possible interop shapes
   formatQuery =
     (mod && (mod.formatQuery as any)) ||
