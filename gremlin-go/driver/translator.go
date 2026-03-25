@@ -215,6 +215,19 @@ func (t *translator) translateTextPredicate(v *textP) (string, error) {
 	return instructionString, nil
 }
 
+func (t *translator) translateJanusGraphPredicate(v *janusGraphP) (string, error) {
+	if v.operator == "" {
+		return "", nil
+	}
+	instructionString := v.operator + "("
+	argString, err := t.toString(v.value)
+	if err != nil {
+		return "", err
+	}
+	instructionString += argString + ")"
+	return instructionString, nil
+}
+
 func (t *translator) translatePredicate(v *p) (string, error) {
 
 	if v.operator == "" || len(v.values) == 0 {
@@ -304,6 +317,9 @@ func (t *translator) toString(arg interface{}) (string, error) {
 		case textP:
 		case *textP:
 			return t.translateTextPredicate(v)
+		case janusGraphP:
+		case *janusGraphP:
+			return t.translateJanusGraphPredicate(v)
 		case p:
 		case *p:
 			return t.translatePredicate(v)

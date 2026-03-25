@@ -626,6 +626,100 @@ func (tp *textP) Or(args ...interface{}) TextPredicate {
 	return newTextPWithP("or", *tp, args...)
 }
 
+type JanusGraphPredicate interface {
+	TextContains(value interface{}) JanusGraphPredicate
+	TextNotContains(value interface{}) JanusGraphPredicate
+	TextContainsPrefix(value interface{}) JanusGraphPredicate
+	TextNotContainsPrefix(value interface{}) JanusGraphPredicate
+	TextContainsRegex(value interface{}) JanusGraphPredicate
+	TextNotContainsRegex(value interface{}) JanusGraphPredicate
+	TextContainsFuzzy(value interface{}) JanusGraphPredicate
+	TextNotContainsFuzzy(value interface{}) JanusGraphPredicate
+	TextContainsPhrase(value interface{}) JanusGraphPredicate
+	TextNotContainsPhrase(value interface{}) JanusGraphPredicate
+	TextPrefix(value interface{}) JanusGraphPredicate
+	TextNotPrefix(value interface{}) JanusGraphPredicate
+	TextRegex(value interface{}) JanusGraphPredicate
+	TextNotRegex(value interface{}) JanusGraphPredicate
+	TextFuzzy(value interface{}) JanusGraphPredicate
+	TextNotFuzzy(value interface{}) JanusGraphPredicate
+}
+
+type janusGraphP struct {
+	operator string
+	value    interface{}
+}
+
+var JanusGraphText JanusGraphPredicate = &janusGraphP{}
+
+func newJanusGraphP(operator string, value interface{}) JanusGraphPredicate {
+	return &janusGraphP{operator: operator, value: value}
+}
+
+func (*janusGraphP) TextContains(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textContains", value)
+}
+
+func (*janusGraphP) TextNotContains(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotContains", value)
+}
+
+func (*janusGraphP) TextContainsPrefix(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textContainsPrefix", value)
+}
+
+func (*janusGraphP) TextNotContainsPrefix(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotContainsPrefix", value)
+}
+
+func (*janusGraphP) TextContainsRegex(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textContainsRegex", value)
+}
+
+func (*janusGraphP) TextNotContainsRegex(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotContainsRegex", value)
+}
+
+func (*janusGraphP) TextContainsFuzzy(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textContainsFuzzy", value)
+}
+
+func (*janusGraphP) TextNotContainsFuzzy(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotContainsFuzzy", value)
+}
+
+func (*janusGraphP) TextContainsPhrase(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textContainsPhrase", value)
+}
+
+func (*janusGraphP) TextNotContainsPhrase(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotContainsPhrase", value)
+}
+
+func (*janusGraphP) TextPrefix(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textPrefix", value)
+}
+
+func (*janusGraphP) TextNotPrefix(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotPrefix", value)
+}
+
+func (*janusGraphP) TextRegex(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textRegex", value)
+}
+
+func (*janusGraphP) TextNotRegex(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotRegex", value)
+}
+
+func (*janusGraphP) TextFuzzy(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textFuzzy", value)
+}
+
+func (*janusGraphP) TextNotFuzzy(value interface{}) JanusGraphPredicate {
+	return newJanusGraphP("textNotFuzzy", value)
+}
+
 type withOptions struct {
 	Tokens  string
 	None    int32

@@ -312,6 +312,37 @@ func TestGraphBinaryV1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, source, res)
 		})
+		t.Run("read-write janusGraphP textContains", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := JanusGraphText.TextContains("foo")
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+			assert.Equal(t, int16(janusGraphPType), int16(encoded[0])<<8|int16(encoded[1]))
+		})
+		t.Run("read-write janusGraphP textFuzzy", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := JanusGraphText.TextFuzzy("foobar")
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+		})
+		t.Run("read-write janusGraphP textRegex", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := JanusGraphText.TextRegex("^foo.*bar$")
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+		})
 	})
 
 	t.Run("error handle tests", func(t *testing.T) {

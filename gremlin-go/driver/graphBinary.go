@@ -34,7 +34,8 @@ import (
 // Version 1.0
 
 // dataType graphBinary types.
-type dataType uint8
+// Uses uint16 to support custom types like JanusGraphP (0x1002)
+type dataType uint16
 
 // dataType defined as constants.
 const (
@@ -86,6 +87,7 @@ const (
 	traversalMetricsType  dataType = 0x2d
 	durationType          dataType = 0x81
 	nullType              dataType = 0xFE
+	janusGraphPType       dataType = 0x1002
 )
 
 var nullBytes = []byte{nullType.getCodeByte(), 0x01}
@@ -95,6 +97,9 @@ func (dataType dataType) getCodeByte() byte {
 }
 
 func (dataType dataType) getCodeBytes() []byte {
+	if dataType > 0xFF {
+		return []byte{byte(dataType >> 8), byte(dataType)}
+	}
 	return []byte{dataType.getCodeByte()}
 }
 
@@ -624,6 +629,24 @@ func textPWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphB
 	return buffer.Bytes(), err
 }
 
+func janusGraphPWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
+	var v janusGraphP
+	if reflect.TypeOf(value).Kind() == reflect.Ptr {
+		v = *(value.(*janusGraphP))
+	} else {
+		v = value.(janusGraphP)
+	}
+	_, err := typeSerializer.writeValue(v.operator, buffer, false)
+	if err != nil {
+		return nil, err
+	}
+	_, err = typeSerializer.write(v.value, buffer)
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
 // Format: {key}{value}
 func bindingWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
 	var v Binding
@@ -718,6 +741,8 @@ func (serializer *graphBinaryTypeSerializer) getType(val interface{}) (dataType,
 		return pType, nil
 	case textP, TextPredicate:
 		return textPType, nil
+	case janusGraphP, *janusGraphP, JanusGraphPredicate:
+		return janusGraphPType, nil
 	case *Binding, Binding:
 		return bindingType, nil
 	case *BigDecimal, BigDecimal:
@@ -1380,4 +1405,16 @@ func customTypeReader(data *[]byte, i *int) (interface{}, error) {
 		return nil, newError(err0409GetSerializerToReadUnknownCustomTypeError, customTypeName)
 	}
 	return deserializer(data, i)
+}
+
+func janusGraphPReader(data *[]byte, i *int) (interface{}, error) {
+	predicateName, err := readString(data, i)
+	if err != nil {
+		return nil, err
+	}
+	value, err := readFullyQualifiedNullable(data, i, true)
+	if err != nil {
+		return nil, err
+	}
+	return &janusGraphP{operator: predicateName.(string), value: value}, nil
 }

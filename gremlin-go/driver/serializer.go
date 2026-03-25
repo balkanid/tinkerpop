@@ -279,6 +279,7 @@ func initSerializers() {
 		mergeType:             enumWriter,
 		pType:                 pWriter,
 		textPType:             textPWriter,
+		janusGraphPType:       janusGraphPWriter,
 		bindingType:           bindingWriter,
 		mapType:               mapWriter,
 		listType:              listWriter,
@@ -332,7 +333,8 @@ func initDeserializers() {
 		traversalMetricsType: traversalMetricsReader,
 
 		// Customer
-		customType: customTypeReader,
+		janusGraphPType: janusGraphPReader,
+		customType:      customTypeReader,
 	}
 	customDeserializers = map[string]CustomTypeReader{}
 }
