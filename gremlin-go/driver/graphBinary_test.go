@@ -312,6 +312,30 @@ func TestGraphBinaryV1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, source, res)
 		})
+		t.Run("read-write custom predicate", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := CustomPredicate("customOp", "v1", int32(7))
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+			assert.Equal(t, byte(pType), encoded[0])
+			assert.Equal(t, byte(valueFlagNone), encoded[1])
+		})
+		t.Run("read-write custom text predicate", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := CustomTextPredicate("textContains", "foo")
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+			assert.Equal(t, byte(textPType), encoded[0])
+			assert.Equal(t, byte(valueFlagNone), encoded[1])
+		})
 	})
 
 	t.Run("error handle tests", func(t *testing.T) {

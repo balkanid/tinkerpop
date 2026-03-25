@@ -439,6 +439,14 @@ type Predicate interface {
 
 var P Predicate = &p{}
 
+// CustomPredicate creates a custom Predicate with the provided operator name.
+//
+// This can be used for vendor-specific predicate operators that are not part of
+// the built-in set exposed on P.
+func CustomPredicate(operator string, args ...interface{}) Predicate {
+	return newP(operator, args...)
+}
+
 func newP(operator string, args ...interface{}) Predicate {
 	values := make([]interface{}, 0)
 	values = append(values, args...)
@@ -562,6 +570,15 @@ type TextPredicate interface {
 type textP p
 
 var TextP TextPredicate = &textP{}
+
+// CustomTextPredicate creates a custom TextPredicate with the provided
+// operator name.
+//
+// This can be used for vendor-specific text predicate operators such as
+// textContains, textRegex, and textFuzzy.
+func CustomTextPredicate(operator string, args ...interface{}) TextPredicate {
+	return newTextP(operator, args...)
+}
 
 func newTextP(operator string, args ...interface{}) TextPredicate {
 	values := make([]interface{}, 0)

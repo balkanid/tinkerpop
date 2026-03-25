@@ -636,6 +636,30 @@ func Test_translator_Translate(t *testing.T) {
 		},
 		{
 			assert: func(g *GraphTraversalSource) *GraphTraversal {
+				return g.V().Has("name", CustomTextPredicate("textContains", "foo"))
+			},
+			equals: "g.V().has('name',textContains('mar'))",
+		},
+		{
+			assert: func(g *GraphTraversalSource) *GraphTraversal {
+				return g.V().Has("name", CustomTextPredicate("textRegex", "^foo"))
+			},
+			equals: "g.V().has('name',textRegex('^mar'))",
+		},
+		{
+			assert: func(g *GraphTraversalSource) *GraphTraversal {
+				return g.V().Has("name", CustomTextPredicate("textFuzzy", "foo"))
+			},
+			equals: "g.V().has('name',textFuzzy('marko'))",
+		},
+		{
+			assert: func(g *GraphTraversalSource) *GraphTraversal {
+				return g.V().Has("age", CustomPredicate("gte", 28))
+			},
+			equals: "g.V().has('age',gte(30))",
+		},
+		{
+			assert: func(g *GraphTraversalSource) *GraphTraversal {
 				return g.V().Has("p1", nil)
 			},
 			equals: "g.V().has('p1',null)",
