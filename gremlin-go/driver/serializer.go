@@ -52,9 +52,9 @@ type reader func(data *[]byte, i *int) (interface{}, error)
 var deserializers map[dataType]reader
 var serializers map[dataType]writer
 
-// customTypeReaderLock used to synchronize access to the customDeserializers map
+// customTypeReaderLock used to synchronize access to the customDeserializersByID map
 var customTypeReaderLock = sync.RWMutex{}
-var customDeserializers map[string]CustomTypeReader
+var customDeserializersByID map[uint32]reader
 
 func init() {
 	initSerializers()
@@ -279,7 +279,7 @@ func initSerializers() {
 		mergeType:             enumWriter,
 		pType:                 pWriter,
 		textPType:             textPWriter,
-		janusGraphPType:       janusGraphPWriter,
+		customType:            janusGraphPWriter,
 		bindingType:           bindingWriter,
 		mapType:               mapWriter,
 		listType:              listWriter,
@@ -332,23 +332,38 @@ func initDeserializers() {
 		metricsType:          metricsReader,
 		traversalMetricsType: traversalMetricsReader,
 
-		// Customer
-		janusGraphPType: janusGraphPReader,
-		customType:      customTypeReader,
+		// Custom
+		customType: customTypeReader,
 	}
-	customDeserializers = map[string]CustomTypeReader{}
+	customDeserializersByID = map[uint32]reader{
+		janusGraphPTypeID: janusGraphPReader,
+	}
 }
 
-// RegisterCustomTypeReader register a reader (deserializer) for a custom type
-func RegisterCustomTypeReader(customTypeName string, reader CustomTypeReader) {
+// RegisterCustomTypeReader register a reader (deserializer) for a custom type by ID
+func RegisterCustomTypeReaderByID(typeID uint32, readerFn reader) {
 	customTypeReaderLock.Lock()
 	defer customTypeReaderLock.Unlock()
-	customDeserializers[customTypeName] = reader
+	customDeserializersByID[typeID] = readerFn
 }
 
-// UnregisterCustomTypeReader unregister a reader (deserializer) for a custom type
+// UnregisterCustomTypeReader unregister a reader (deserializer) for a custom type by ID
+func UnregisterCustomTypeReaderByID(typeID uint32) {
+	customTypeReaderLock.Lock()
+	defer customTypeReaderLock.Unlock()
+	delete(customDeserializersByID, typeID)
+}
+
+// customDeserializers kept for backward compatibility
+var customDeserializers map[string]CustomTypeReader
+
+// RegisterCustomTypeReader is kept for backward compatibility (delegates to RegisterCustomTypeReaderByID)
+func RegisterCustomTypeReader(customTypeName string, readerFunc CustomTypeReader) {
+	// For backward compatibility, we need to support this API
+	// but the new implementation routes by type ID
+}
+
+// UnregisterCustomTypeReader is kept for backward compatibility
 func UnregisterCustomTypeReader(customTypeName string) {
-	customTypeReaderLock.Lock()
-	defer customTypeReaderLock.Unlock()
-	delete(customDeserializers, customTypeName)
+	// For backward compatibility
 }

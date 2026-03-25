@@ -321,7 +321,27 @@ func TestGraphBinaryV1(t *testing.T) {
 			assert.Nil(t, err)
 			encoded := buffer.Bytes()
 			assert.GreaterOrEqual(t, len(encoded), 2)
-			assert.Equal(t, int16(janusGraphPType), int16(encoded[0])<<8|int16(encoded[1]))
+			// Custom type code is 0x00
+			assert.Equal(t, byte(customType), encoded[0])
+			// Verify type name follows
+			typeName := "janusgraph.P"
+			typeInfoLen := int32(len(typeName))
+			// Read length from bytes 1-4 (big endian)
+			readLen := int32(encoded[1])<<24 | int32(encoded[2])<<16 | int32(encoded[3])<<8 | int32(encoded[4])
+			assert.Equal(t, typeInfoLen, readLen)
+			// Read type name string
+			readTypeName := string(encoded[5 : 5+int(readLen)])
+			assert.Equal(t, typeName, readTypeName)
+
+			// Test round-trip: read back what we wrote
+			i := 0
+			result, err := readFullyQualifiedNullable(&encoded, &i, true)
+			assert.Nil(t, err)
+			assert.NotNil(t, result)
+			jgp, ok := result.(*janusGraphP)
+			assert.True(t, ok)
+			assert.Equal(t, "textContains", jgp.operator)
+			assert.Equal(t, "foo", jgp.value.(string))
 		})
 		t.Run("read-write janusGraphP textFuzzy", func(t *testing.T) {
 			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}

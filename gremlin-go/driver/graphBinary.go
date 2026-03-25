@@ -34,8 +34,7 @@ import (
 // Version 1.0
 
 // dataType graphBinary types.
-// Uses uint16 to support custom types like JanusGraphP (0x1002)
-type dataType uint16
+type dataType uint8
 
 // dataType defined as constants.
 const (
@@ -87,7 +86,6 @@ const (
 	traversalMetricsType  dataType = 0x2d
 	durationType          dataType = 0x81
 	nullType              dataType = 0xFE
-	janusGraphPType       dataType = 0x1002
 )
 
 var nullBytes = []byte{nullType.getCodeByte(), 0x01}
@@ -97,9 +95,6 @@ func (dataType dataType) getCodeByte() byte {
 }
 
 func (dataType dataType) getCodeBytes() []byte {
-	if dataType > 0xFF {
-		return []byte{byte(dataType >> 8), byte(dataType)}
-	}
 	return []byte{dataType.getCodeByte()}
 }
 
@@ -647,6 +642,9 @@ func janusGraphPWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *
 	return buffer.Bytes(), nil
 }
 
+const janusGraphPTypeName = "janusgraph.P"
+const janusGraphPTypeID uint32 = 0x1002
+
 // Format: {key}{value}
 func bindingWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
 	var v Binding
@@ -742,7 +740,7 @@ func (serializer *graphBinaryTypeSerializer) getType(val interface{}) (dataType,
 	case textP, TextPredicate:
 		return textPType, nil
 	case janusGraphP, *janusGraphP, JanusGraphPredicate:
-		return janusGraphPType, nil
+		return customType, nil
 	case *Binding, Binding:
 		return bindingType, nil
 	case *BigDecimal, BigDecimal:
@@ -804,6 +802,30 @@ func (serializer *graphBinaryTypeSerializer) write(valueObject interface{}, buff
 		return nil, err
 	}
 	buffer.Write(dataType.getCodeBytes())
+
+	// For custom types (JanusGraph predicates), write the type info and then call the writer directly
+	// without a value_flag (the second custom type code acts as the value indicator)
+	if dataType == customType {
+		// Write type name length (int32) and type name
+		err := binary.Write(buffer, binary.BigEndian, int32(len(janusGraphPTypeName)))
+		if err != nil {
+			return nil, err
+		}
+		buffer.WriteString(janusGraphPTypeName)
+
+		// Write type ID (uint32)
+		err = binary.Write(buffer, binary.BigEndian, janusGraphPTypeID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Write custom type code again (as per JanusGraph Python implementation)
+		buffer.WriteByte(byte(customType))
+
+		// Call the writer directly without value_flag
+		return writer(valueObject, buffer, serializer)
+	}
+
 	return serializer.writeType(valueObject, buffer, writer)
 }
 
@@ -1388,30 +1410,47 @@ func readFullyQualifiedNullable(data *[]byte, i *int, nullable bool) (interface{
 	return deserializer(data, i)
 }
 
-// {name}{type specific payload}
+// Custom type format (JanusGraph-specific):
+// {custom_type_code}{type_name_length}{type_name}{type_id}{custom_type_code}{...specific_data...}
+// Note: When called from readFullyQualifiedNullable, the type code and value flag have been read.
+// The value flag "read" is actually the first byte of type_name_length, so we go back 1 byte.
 func customTypeReader(data *[]byte, i *int) (interface{}, error) {
-	// we need to decrement the index by 1 to be read the 32-bit int with the size of the string
+	// Go back 1 byte to re-read from the type name length
 	*i = *i - 1
-	customTypeName, err := readString(data, i)
-	if err != nil {
-		return nil, err
+
+	// Read type name length (int32)
+	typeNameLen := readIntSafe(data, i)
+	typeName := string((*data)[*i : *i+int(typeNameLen)])
+	*i += int(typeNameLen)
+
+	// Read type ID (uint32)
+	typeID := binary.BigEndian.Uint32(*readTemp(data, i, 4))
+
+	// Read second custom type code
+	secondCode := readByteSafe(data, i)
+	if secondCode != byte(customType) {
+		return nil, newError(err0408GetSerializerToReadUnknownTypeError, secondCode)
 	}
 
-	// grab a read lock for the map of deserializers, since these can be updated out-of-band
+	// Dispatch based on type ID
 	customTypeReaderLock.RLock()
-	defer customTypeReaderLock.RUnlock()
-	deserializer, ok := customDeserializers[customTypeName.(string)]
+	deserializer, ok := customDeserializersByID[typeID]
+	customTypeReaderLock.RUnlock()
+
 	if !ok {
-		return nil, newError(err0409GetSerializerToReadUnknownCustomTypeError, customTypeName)
+		return nil, newError(err0409GetSerializerToReadUnknownCustomTypeError, typeName)
 	}
 	return deserializer(data, i)
 }
 
 func janusGraphPReader(data *[]byte, i *int) (interface{}, error) {
+	// Read operator string (value format: length + chars)
 	predicateName, err := readString(data, i)
 	if err != nil {
 		return nil, err
 	}
+
+	// Read value (fully qualified)
 	value, err := readFullyQualifiedNullable(data, i, true)
 	if err != nil {
 		return nil, err
