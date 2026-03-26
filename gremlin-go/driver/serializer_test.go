@@ -20,7 +20,6 @@ under the License.
 package gremlingo
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -63,10 +62,7 @@ func TestSerializer(t *testing.T) {
 	})
 
 	t.Run("test serialized response message w/ custom type", func(t *testing.T) {
-		RegisterCustomTypeReader("janusgraph.RelationIdentifier", exampleJanusgraphRelationIdentifierReader)
-		defer func() {
-			UnregisterCustomTypeReader("janusgraph.RelationIdentifier")
-		}()
+		// This test uses the built-in RelationIdentifier deserializer
 		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 52, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 29, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 82, 101, 108, 97, 116, 105, 111, 110, 73, 100, 101, 110, 116, 105, 102, 105, 101, 114, 0, 0, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 16, 240, 0, 0, 0, 0, 0, 0, 100, 21, 0, 0, 0, 0, 0, 0, 24, 30, 0, 0, 0, 0, 0, 0, 0, 32, 56}
 		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
 		response, err := serializer.deserializeMessage(responseByteArray)
@@ -77,6 +73,15 @@ func TestSerializer(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{"host": "/10.244.0.33:51470"}, response.responseStatus.attributes)
 		assert.Equal(t, map[string]interface{}{}, response.responseResult.meta)
 		assert.NotNil(t, response.responseResult.data)
+		// Verify the RelationIdentifier was deserialized correctly
+		data := response.responseResult.data.([]interface{})
+		assert.Equal(t, 1, len(data))
+		trav := data[0].(*Traverser)
+		ri := trav.value.(*RelationIdentifier)
+		assert.Equal(t, int64(4336), ri.OutVertexID)
+		assert.Equal(t, int64(25621), ri.TypeID)
+		assert.Equal(t, int64(6174), ri.RelationID)
+		assert.Equal(t, int64(8248), ri.InVertexID)
 	})
 }
 
@@ -97,8 +102,10 @@ func TestSerializerFailures(t *testing.T) {
 		assert.True(t, isSameErrorCode(newError(err0704ConvertArgsNoSerializerError), err))
 	})
 
-	t.Run("test unkownCustomType failure", func(t *testing.T) {
-		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 52, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 29, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 82, 101, 108, 97, 116, 105, 111, 110, 73, 100, 101, 110, 116, 105, 102, 105, 101, 114, 0, 0, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 16, 240, 0, 0, 0, 0, 0, 0, 100, 21, 0, 0, 0, 0, 0, 0, 24, 30, 0, 0, 0, 0, 0, 0, 0, 32, 56}
+	t.Run("test unknownCustomType failure", func(t *testing.T) {
+		// Use a custom type ID that doesn't exist (0x9999 is not registered)
+		// The byte array below contains type name "janusgraph.Unknown" with type ID 0x9999
+		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 52, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 20, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 85, 110, 107, 110, 111, 119, 110, 0, 0, 153, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
 		resp, err := serializer.deserializeMessage(responseByteArray)
 		// a partial message will still be returned
@@ -106,28 +113,4 @@ func TestSerializerFailures(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.True(t, isSameErrorCode(newError(err0409GetSerializerToReadUnknownCustomTypeError), err))
 	})
-}
-
-// exampleJanusgraphRelationIdentifierReader this implementation is not complete and is used only for the purposes of testing custom readers
-func exampleJanusgraphRelationIdentifierReader(data *[]byte, i *int) (interface{}, error) {
-	const relationIdentifierType = 0x1001
-	const longMarker = 0
-
-	// expect type code
-	customDataTyp := readUint32Safe(data, i)
-	if customDataTyp != relationIdentifierType {
-		return nil, fmt.Errorf("unknown type code. got 0x%x, expected 0x%x", customDataTyp, relationIdentifierType)
-	}
-
-	// value flag, expect this to be non-nullable
-	if readByteSafe(data, i) != valueFlagNone {
-		return nil, errors.New("expected non-null value")
-	}
-
-	// outVertexId
-	if readByteSafe(data, i) == longMarker {
-		return readLongSafe(data, i), nil
-	} else {
-		return readString(data, i)
-	}
 }

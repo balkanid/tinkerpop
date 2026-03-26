@@ -363,6 +363,88 @@ func TestGraphBinaryV1(t *testing.T) {
 			encoded := buffer.Bytes()
 			assert.GreaterOrEqual(t, len(encoded), 2)
 		})
+		t.Run("read-write RelationIdentifier with long IDs", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := NewRelationIdentifier(int64(4336), int64(25621), int64(6174), int64(8248))
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+			assert.GreaterOrEqual(t, len(encoded), 2)
+
+			// Verify round-trip
+			i := 0
+			result, err := readFullyQualifiedNullable(&encoded, &i, true)
+			assert.Nil(t, err)
+			assert.NotNil(t, result)
+			ri, ok := result.(*RelationIdentifier)
+			assert.True(t, ok)
+			assert.Equal(t, int64(4336), ri.OutVertexID)
+			assert.Equal(t, int64(25621), ri.TypeID)
+			assert.Equal(t, int64(6174), ri.RelationID)
+			assert.Equal(t, int64(8248), ri.InVertexID)
+		})
+		t.Run("read-write RelationIdentifier with nil inVertexID", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := NewRelationIdentifier(int64(4336), int64(25621), int64(6174), nil)
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+
+			i := 0
+			result, err := readFullyQualifiedNullable(&encoded, &i, true)
+			assert.Nil(t, err)
+			ri, ok := result.(*RelationIdentifier)
+			assert.True(t, ok)
+			assert.Equal(t, int64(4336), ri.OutVertexID)
+			assert.Equal(t, int64(25621), ri.TypeID)
+			assert.Equal(t, int64(6174), ri.RelationID)
+			assert.Nil(t, ri.InVertexID)
+		})
+		t.Run("read-write RelationIdentifier with string IDs", func(t *testing.T) {
+			serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+			var buffer bytes.Buffer
+			source := NewRelationIdentifier("jupiter", int64(25621), int64(6174), "pluto")
+
+			_, err := serializer.write(source, &buffer)
+			assert.Nil(t, err)
+			encoded := buffer.Bytes()
+
+			i := 0
+			result, err := readFullyQualifiedNullable(&encoded, &i, true)
+			assert.Nil(t, err)
+			ri, ok := result.(*RelationIdentifier)
+			assert.True(t, ok)
+			assert.Equal(t, "jupiter", ri.OutVertexID)
+			assert.Equal(t, int64(25621), ri.TypeID)
+			assert.Equal(t, int64(6174), ri.RelationID)
+			assert.Equal(t, "pluto", ri.InVertexID)
+		})
+		t.Run("parse RelationIdentifier from string", func(t *testing.T) {
+			// Test encoding/decoding of string format
+			// Create a RelationIdentifier and verify its string representation
+			// String format is: relationID-outVertexID-typeID[-inVertexID]
+			ri := NewRelationIdentifier(int64(100), int64(50), int64(200), nil)
+			str := ri.String()
+			assert.NotEmpty(t, str)
+
+			// Parse it back
+			decodedRi, err := ParseRelationIdentifier(str)
+			assert.Nil(t, err)
+			// Fields: OutVertexID=100, TypeID=50, RelationID=200
+			assert.Equal(t, int64(100), decodedRi.OutVertexID)
+			assert.Equal(t, int64(50), decodedRi.TypeID)
+			assert.Equal(t, int64(200), decodedRi.RelationID)
+			assert.Nil(t, decodedRi.InVertexID)
+		})
+		t.Run("RelationIdentifier string representation", func(t *testing.T) {
+			ri := NewRelationIdentifier(int64(4336), int64(25621), int64(6174), nil)
+			str := ri.String()
+			assert.Contains(t, str, "-")
+		})
 	})
 
 	t.Run("error handle tests", func(t *testing.T) {

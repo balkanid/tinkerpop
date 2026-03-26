@@ -642,8 +642,81 @@ func janusGraphPWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *
 	return buffer.Bytes(), nil
 }
 
+func relationIdentifierWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
+	var v RelationIdentifier
+	if reflect.TypeOf(value).Kind() == reflect.Ptr {
+		v = *(value.(*RelationIdentifier))
+	} else {
+		v = value.(RelationIdentifier)
+	}
+
+	const longMarker uint8 = 0
+	const stringMarker uint8 = 1
+
+	// Write out vertex ID
+	if vid, ok := v.OutVertexID.(int64); ok {
+		buffer.WriteByte(longMarker)
+		binary.Write(buffer, binary.BigEndian, vid)
+	} else {
+		buffer.WriteByte(stringMarker)
+		writeJanusGraphString(buffer, fmt.Sprintf("%v", v.OutVertexID))
+	}
+
+	// Write type ID (int64)
+	binary.Write(buffer, binary.BigEndian, v.TypeID)
+
+	// Write relation ID (int64)
+	binary.Write(buffer, binary.BigEndian, v.RelationID)
+
+	// Write in vertex ID
+	if v.InVertexID == nil {
+		buffer.WriteByte(longMarker)
+		binary.Write(buffer, binary.BigEndian, int64(0))
+	} else if vid, ok := v.InVertexID.(int64); ok {
+		buffer.WriteByte(longMarker)
+		binary.Write(buffer, binary.BigEndian, vid)
+	} else {
+		buffer.WriteByte(stringMarker)
+		writeJanusGraphString(buffer, fmt.Sprintf("%v", v.InVertexID))
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func writeJanusGraphString(buffer *bytes.Buffer, s string) {
+	b := []byte(s)
+	for i, ch := range b {
+		if i == len(b)-1 {
+			buffer.WriteByte(ch | 0x80)
+		} else {
+			buffer.WriteByte(ch)
+		}
+	}
+}
+
 const janusGraphPTypeName = "janusgraph.P"
 const janusGraphPTypeID uint32 = 0x1002
+
+type customTypeInfo struct {
+	typeName string
+	typeID   uint32
+	writer   writer
+}
+
+var customTypes = map[reflect.Type]customTypeInfo{}
+
+func init() {
+	customTypes[reflect.TypeOf(janusGraphP{})] = customTypeInfo{
+		typeName: janusGraphPTypeName,
+		typeID:   janusGraphPTypeID,
+		writer:   janusGraphPWriter,
+	}
+	customTypes[reflect.TypeOf(RelationIdentifier{})] = customTypeInfo{
+		typeName: relationIdentifierTypeName,
+		typeID:   relationIdentifierTypeID,
+		writer:   relationIdentifierWriter,
+	}
+}
 
 // Format: {key}{value}
 func bindingWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
@@ -741,6 +814,8 @@ func (serializer *graphBinaryTypeSerializer) getType(val interface{}) (dataType,
 		return textPType, nil
 	case janusGraphP, *janusGraphP, JanusGraphPredicate:
 		return customType, nil
+	case RelationIdentifier, *RelationIdentifier:
+		return customType, nil
 	case *Binding, Binding:
 		return bindingType, nil
 	case *BigDecimal, BigDecimal:
@@ -806,15 +881,26 @@ func (serializer *graphBinaryTypeSerializer) write(valueObject interface{}, buff
 	// For custom types (JanusGraph predicates), write the type info and then call the writer directly
 	// without a value_flag (the second custom type code acts as the value indicator)
 	if dataType == customType {
+		// Look up custom type info based on value type
+		valType := reflect.TypeOf(valueObject)
+		if valType.Kind() == reflect.Ptr {
+			valType = valType.Elem()
+		}
+		typeInfo, ok := customTypes[valType]
+		if !ok {
+			serializer.logHandler.logf(Error, serializeDataTypeError, valType.Name())
+			return nil, newError(err0407GetSerializerToWriteUnknownTypeError, valType.Name())
+		}
+
 		// Write type name length (int32) and type name
-		err := binary.Write(buffer, binary.BigEndian, int32(len(janusGraphPTypeName)))
+		err := binary.Write(buffer, binary.BigEndian, int32(len(typeInfo.typeName)))
 		if err != nil {
 			return nil, err
 		}
-		buffer.WriteString(janusGraphPTypeName)
+		buffer.WriteString(typeInfo.typeName)
 
 		// Write type ID (uint32)
-		err = binary.Write(buffer, binary.BigEndian, janusGraphPTypeID)
+		err = binary.Write(buffer, binary.BigEndian, typeInfo.typeID)
 		if err != nil {
 			return nil, err
 		}
@@ -823,7 +909,7 @@ func (serializer *graphBinaryTypeSerializer) write(valueObject interface{}, buff
 		buffer.WriteByte(byte(customType))
 
 		// Call the writer directly without value_flag
-		return writer(valueObject, buffer, serializer)
+		return typeInfo.writer(valueObject, buffer, serializer)
 	}
 
 	return serializer.writeType(valueObject, buffer, writer)
@@ -1456,4 +1542,56 @@ func janusGraphPReader(data *[]byte, i *int) (interface{}, error) {
 		return nil, err
 	}
 	return &janusGraphP{operator: predicateName.(string), value: value}, nil
+}
+
+func relationIdentifierReader(data *[]byte, i *int) (interface{}, error) {
+	const longMarker uint8 = 0
+	const stringMarker uint8 = 1
+
+	// Read out vertex marker
+	outMarker := readByteSafe(data, i)
+
+	var outVertexID interface{}
+	if outMarker == stringMarker {
+		// Read string until terminator (bit 7 set on last char)
+		outVertexID = readJanusGraphString(data, i)
+	} else {
+		// Read int64
+		outVertexID = readLongSafe(data, i)
+	}
+
+	// Read type ID (int64)
+	typeID := readLongSafe(data, i)
+
+	// Read relation ID (int64)
+	relationID := readLongSafe(data, i)
+
+	// Read in vertex marker
+	inMarker := readByteSafe(data, i)
+
+	var inVertexID interface{}
+	if inMarker == stringMarker {
+		inVertexID = readJanusGraphString(data, i)
+	} else {
+		inVid := readLongSafe(data, i)
+		if inVid == 0 {
+			inVertexID = nil
+		} else {
+			inVertexID = inVid
+		}
+	}
+
+	return NewRelationIdentifier(outVertexID, typeID, relationID, inVertexID), nil
+}
+
+func readJanusGraphString(data *[]byte, i *int) string {
+	var result []byte
+	for {
+		b := readByteSafe(data, i)
+		result = append(result, b&0x7F)
+		if b&0x80 != 0 {
+			break
+		}
+	}
+	return string(result)
 }

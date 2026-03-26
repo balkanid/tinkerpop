@@ -20,7 +20,9 @@ under the License.
 package gremlingo
 
 import (
+	"fmt"
 	"math/big"
+	"strings"
 )
 
 // Traverser is the objects propagating through the traversal.
@@ -718,6 +720,155 @@ func (*janusGraphP) TextFuzzy(value interface{}) JanusGraphPredicate {
 
 func (*janusGraphP) TextNotFuzzy(value interface{}) JanusGraphPredicate {
 	return newJanusGraphP("textNotFuzzy", value)
+}
+
+const relationIdentifierTypeName = "janusgraph.RelationIdentifier"
+const relationIdentifierTypeID uint32 = 0x1001
+
+type RelationIdentifier struct {
+	OutVertexID interface{}
+	TypeID      int64
+	RelationID  int64
+	InVertexID  interface{}
+	stringRep   string
+}
+
+func (r *RelationIdentifier) String() string {
+	if r.stringRep != "" {
+		return r.stringRep
+	}
+	return r.stringRep
+}
+
+func NewRelationIdentifier(outVertexID interface{}, typeID int64, relationID int64, inVertexID interface{}) *RelationIdentifier {
+	ri := &RelationIdentifier{
+		OutVertexID: outVertexID,
+		TypeID:      typeID,
+		RelationID:  relationID,
+		InVertexID:  inVertexID,
+	}
+	ri.stringRep = ri.buildString()
+	return ri
+}
+
+func (r *RelationIdentifier) buildString() string {
+	parts := make([]string, 0, 4)
+	parts = append(parts, longEncode(r.RelationID))
+	parts = append(parts, "-")
+	if vid, ok := r.OutVertexID.(int64); ok {
+		parts = append(parts, longEncode(vid))
+	} else {
+		parts = append(parts, stringEncodingMarker)
+		parts = append(parts, fmt.Sprintf("%v", r.OutVertexID))
+	}
+	parts = append(parts, "-")
+	parts = append(parts, longEncode(r.TypeID))
+	if r.InVertexID != nil {
+		parts = append(parts, "-")
+		if vid, ok := r.InVertexID.(int64); ok {
+			parts = append(parts, longEncode(vid))
+		} else {
+			parts = append(parts, stringEncodingMarker)
+			parts = append(parts, fmt.Sprintf("%v", r.InVertexID))
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+const stringEncodingMarker = "S"
+
+const baseSymbols = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+func longEncode(num int64) string {
+	if num == 0 {
+		return "0"
+	}
+	absNum := num
+	if num < 0 {
+		absNum = -num
+	}
+	var chars []byte
+	for absNum > 0 {
+		chars = append(chars, baseSymbols[absNum%int64(len(baseSymbols))])
+		absNum /= int64(len(baseSymbols))
+	}
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	result := string(chars)
+	if num < 0 {
+		result = "-" + result
+	}
+	return result
+}
+
+func longDecode(s string) (int64, error) {
+	if s == "" {
+		return 0, fmt.Errorf("empty string")
+	}
+	neg := false
+	if s[0] == '-' {
+		neg = true
+		s = s[1:]
+	}
+	var num int64 = 0
+	for _, ch := range s {
+		num *= int64(len(baseSymbols))
+		pos := strings.IndexRune(baseSymbols, ch)
+		if pos < 0 {
+			return 0, fmt.Errorf("invalid character '%c' in encoded long", ch)
+		}
+		num += int64(pos)
+	}
+	if neg {
+		num = -num
+	}
+	return num, nil
+}
+
+func ParseRelationIdentifier(s string) (*RelationIdentifier, error) {
+	parts := strings.Split(s, "-")
+	if len(parts) != 3 && len(parts) != 4 {
+		return nil, fmt.Errorf("invalid relation identifier format: %s", s)
+	}
+	relationID, err := longDecode(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid relation ID: %v", err)
+	}
+	var outVertexID interface{}
+	if strings.HasPrefix(parts[1], stringEncodingMarker) {
+		outVertexID = parts[1][1:]
+	} else {
+		vid, err := longDecode(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid out vertex ID: %v", err)
+		}
+		outVertexID = vid
+	}
+	typeID, err := longDecode(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid type ID: %v", err)
+	}
+	var inVertexID interface{}
+	if len(parts) == 4 {
+		if strings.HasPrefix(parts[3], stringEncodingMarker) {
+			inVertexID = parts[3][1:]
+		} else {
+			vid, err := longDecode(parts[3])
+			if err != nil {
+				return nil, fmt.Errorf("invalid in vertex ID: %v", err)
+			}
+			inVertexID = vid
+		}
+	}
+	return NewRelationIdentifier(outVertexID, typeID, relationID, inVertexID), nil
+}
+
+func (r *RelationIdentifier) Equal(other *RelationIdentifier) bool {
+	if other == nil {
+		return false
+	}
+	return r.stringRep == other.stringRep
 }
 
 type withOptions struct {

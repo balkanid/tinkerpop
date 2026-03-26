@@ -336,7 +336,8 @@ func initDeserializers() {
 		customType: customTypeReader,
 	}
 	customDeserializersByID = map[uint32]reader{
-		janusGraphPTypeID: janusGraphPReader,
+		janusGraphPTypeID:        janusGraphPReader,
+		relationIdentifierTypeID: relationIdentifierReader,
 	}
 }
 
