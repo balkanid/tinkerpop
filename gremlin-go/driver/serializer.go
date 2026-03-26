@@ -25,7 +25,6 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 )
@@ -51,10 +50,6 @@ type reader func(data *[]byte, i *int) (interface{}, error)
 
 var deserializers map[dataType]reader
 var serializers map[dataType]writer
-
-// customTypeReaderLock used to synchronize access to the customDeserializersByID map
-var customTypeReaderLock = sync.RWMutex{}
-var customDeserializersByID map[uint32]reader
 
 func init() {
 	initSerializers()
@@ -279,7 +274,7 @@ func initSerializers() {
 		mergeType:             enumWriter,
 		pType:                 pWriter,
 		textPType:             textPWriter,
-		customType:            janusGraphPWriter,
+		customType:            customTypeWriter,
 		bindingType:           bindingWriter,
 		mapType:               mapWriter,
 		listType:              listWriter,
@@ -335,36 +330,27 @@ func initDeserializers() {
 		// Custom
 		customType: customTypeReader,
 	}
-	customDeserializersByID = map[uint32]reader{
-		janusGraphPTypeID:        janusGraphPReader,
-		relationIdentifierTypeID: relationIdentifierReader,
-	}
 }
 
-// RegisterCustomTypeReader register a reader (deserializer) for a custom type by ID
+// RegisterCustomTypeReaderByID is deprecated. Use RegisterCustomTypeCodec instead.
 func RegisterCustomTypeReaderByID(typeID uint32, readerFn reader) {
-	customTypeReaderLock.Lock()
-	defer customTypeReaderLock.Unlock()
-	customDeserializersByID[typeID] = readerFn
+	// Deprecated: Use RegisterCustomTypeCodec from custom_types.go
 }
 
-// UnregisterCustomTypeReader unregister a reader (deserializer) for a custom type by ID
+// UnregisterCustomTypeReaderByID is deprecated. Use UnregisterCustomTypeCodec instead.
 func UnregisterCustomTypeReaderByID(typeID uint32) {
-	customTypeReaderLock.Lock()
-	defer customTypeReaderLock.Unlock()
-	delete(customDeserializersByID, typeID)
+	// Deprecated: Use UnregisterCustomTypeCodec from custom_types.go
 }
 
 // customDeserializers kept for backward compatibility
 var customDeserializers map[string]CustomTypeReader
 
-// RegisterCustomTypeReader is kept for backward compatibility (delegates to RegisterCustomTypeReaderByID)
+// RegisterCustomTypeReader is kept for backward compatibility.
 func RegisterCustomTypeReader(customTypeName string, readerFunc CustomTypeReader) {
-	// For backward compatibility, we need to support this API
-	// but the new implementation routes by type ID
+	// Deprecated: Use RegisterCustomTypeCodec from custom_types.go
 }
 
-// UnregisterCustomTypeReader is kept for backward compatibility
+// UnregisterCustomTypeReader is kept for backward compatibility.
 func UnregisterCustomTypeReader(customTypeName string) {
-	// For backward compatibility
+	// Deprecated
 }

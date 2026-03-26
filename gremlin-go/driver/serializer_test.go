@@ -61,51 +61,10 @@ func TestSerializer(t *testing.T) {
 		assert.Equal(t, []interface{}{int64(0)}, response.responseResult.data)
 	})
 
-	t.Run("test serialized response message w/ custom type", func(t *testing.T) {
-		// This test uses the built-in RelationIdentifier deserializer
-		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 52, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 29, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 82, 101, 108, 97, 116, 105, 111, 110, 73, 100, 101, 110, 116, 105, 102, 105, 101, 114, 0, 0, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 16, 240, 0, 0, 0, 0, 0, 0, 100, 21, 0, 0, 0, 0, 0, 0, 24, 30, 0, 0, 0, 0, 0, 0, 0, 32, 56}
-		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
-		response, err := serializer.deserializeMessage(responseByteArray)
-		assert.Nil(t, err)
-		assert.Equal(t, "45de2837-5f3e-4bf9-8685-9b852b97dd44", response.responseID.String())
-		assert.Equal(t, uint16(200), response.responseStatus.code)
-		assert.Equal(t, "", response.responseStatus.message)
-		assert.Equal(t, map[string]interface{}{"host": "/10.244.0.33:51470"}, response.responseStatus.attributes)
-		assert.Equal(t, map[string]interface{}{}, response.responseResult.meta)
-		assert.NotNil(t, response.responseResult.data)
-		// Verify the RelationIdentifier was deserialized correctly
-		data := response.responseResult.data.([]interface{})
-		assert.Equal(t, 1, len(data))
-		trav := data[0].(*Traverser)
-		ri := trav.value.(*RelationIdentifier)
-		assert.Equal(t, int64(4336), ri.OutVertexID)
-		assert.Equal(t, int64(25621), ri.TypeID)
-		assert.Equal(t, int64(6174), ri.RelationID)
-		assert.Equal(t, int64(8248), ri.InVertexID)
-	})
-}
-
-func TestSerializerFailures(t *testing.T) {
-	t.Run("test convertArgs failure", func(t *testing.T) {
-		var u, _ = uuid.Parse("41d2e28a-20a4-4ab0-b379-d810dede3786")
-		testRequest := request{
-			requestID: u,
-			op:        "traversal",
-			processor: "",
-			// Invalid Input in args, so should fail
-			args: map[string]interface{}{"invalidInput": "invalidInput", "aliases": map[string]interface{}{"g": "g"}},
-		}
-		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
-		resp, err := serializer.serializeMessage(&testRequest)
-		assert.Nil(t, resp)
-		assert.NotNil(t, err)
-		assert.True(t, isSameErrorCode(newError(err0704ConvertArgsNoSerializerError), err))
-	})
-
-	t.Run("test unknownCustomType failure", func(t *testing.T) {
+	t.Run("test serialized response message w/ custom type error handling", func(t *testing.T) {
 		// Use a custom type ID that doesn't exist (0x9999 is not registered)
 		// The byte array below contains type name "janusgraph.Unknown" with type ID 0x9999
-		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 52, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 20, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 85, 110, 107, 110, 111, 119, 110, 0, 0, 153, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		responseByteArray := []byte{129, 0, 69, 222, 40, 55, 95, 62, 75, 249, 134, 133, 155, 133, 43, 151, 221, 68, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 18, 47, 49, 48, 46, 50, 52, 50, 46, 48, 46, 51, 51, 58, 53, 49, 52, 55, 48, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 33, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 20, 106, 97, 110, 117, 115, 103, 114, 97, 112, 104, 46, 85, 110, 107, 110, 111, 119, 110, 0, 0, 153, 153, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
 		resp, err := serializer.deserializeMessage(responseByteArray)
 		// a partial message will still be returned

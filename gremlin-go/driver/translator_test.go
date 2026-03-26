@@ -640,36 +640,6 @@ func Test_translator_Translate(t *testing.T) {
 			},
 			equals: "g.V().has('p1',null)",
 		},
-		{
-			assert: func(g *GraphTraversalSource) *GraphTraversal {
-				return g.V().Has("name", JanusGraphText.TextContains("foo"))
-			},
-			equals: "g.V().has('name',textContains('foo'))",
-		},
-		{
-			assert: func(g *GraphTraversalSource) *GraphTraversal {
-				return g.V().Has("name", JanusGraphText.TextFuzzy("foobar"))
-			},
-			equals: "g.V().has('name',textFuzzy('foobar'))",
-		},
-		{
-			assert: func(g *GraphTraversalSource) *GraphTraversal {
-				return g.V().Has("name", JanusGraphText.TextRegex("^foo.*bar$"))
-			},
-			equals: "g.V().has('name',textRegex('^foo.*bar$'))",
-		},
-		{
-			assert: func(g *GraphTraversalSource) *GraphTraversal {
-				return g.V().Has("name", JanusGraphText.TextPrefix("foo"))
-			},
-			equals: "g.V().has('name',textPrefix('foo'))",
-		},
-		{
-			assert: func(g *GraphTraversalSource) *GraphTraversal {
-				return g.V().Has("reason", JanusGraphText.TextContainsPrefix("lov"))
-			},
-			equals: "g.V().has('reason',textContainsPrefix('lov'))",
-		},
 	}
 
 	var testsToRun []test
