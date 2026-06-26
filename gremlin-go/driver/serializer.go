@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"golang.org/x/text/language"
 )
 
 const graphBinaryMimeType = "application/vnd.graphbinary-v1.0"
@@ -41,9 +42,6 @@ type serializer interface {
 type graphBinarySerializer struct {
 	ser *graphBinaryTypeSerializer
 }
-
-// CustomTypeReader user provided function to deserialize custom types
-type CustomTypeReader func(data *[]byte, i *int) (interface{}, error)
 
 type writer func(interface{}, *bytes.Buffer, *graphBinaryTypeSerializer) ([]byte, error)
 type reader func(data *[]byte, i *int) (interface{}, error)
@@ -332,25 +330,22 @@ func initDeserializers() {
 	}
 }
 
-// RegisterCustomTypeReaderByID is deprecated. Use RegisterCustomTypeCodec instead.
-func RegisterCustomTypeReaderByID(typeID uint32, readerFn reader) {
-	// Deprecated: Use RegisterCustomTypeCodec from custom_types.go
+// SerializeValue writes a single value to its GraphBinary fully-qualified
+// representation ({type_code}{type_info}{value_flag}{value}). It honours any
+// custom type codecs registered via RegisterCustomTypeCodec, so vendor packages
+// can round-trip their own types without reaching into driver internals.
+func SerializeValue(value interface{}) ([]byte, error) {
+	serializer := graphBinaryTypeSerializer{newLogHandler(&defaultLogger{}, Error, language.English)}
+	var buffer bytes.Buffer
+	if _, err := serializer.write(value, &buffer); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
 
-// UnregisterCustomTypeReaderByID is deprecated. Use UnregisterCustomTypeCodec instead.
-func UnregisterCustomTypeReaderByID(typeID uint32) {
-	// Deprecated: Use UnregisterCustomTypeCodec from custom_types.go
-}
-
-// customDeserializers kept for backward compatibility
-var customDeserializers map[string]CustomTypeReader
-
-// RegisterCustomTypeReader is kept for backward compatibility.
-func RegisterCustomTypeReader(customTypeName string, readerFunc CustomTypeReader) {
-	// Deprecated: Use RegisterCustomTypeCodec from custom_types.go
-}
-
-// UnregisterCustomTypeReader is kept for backward compatibility.
-func UnregisterCustomTypeReader(customTypeName string) {
-	// Deprecated
+// DeserializeValue reads a single GraphBinary fully-qualified value, the inverse
+// of SerializeValue. It honours registered custom type codecs.
+func DeserializeValue(data []byte) (interface{}, error) {
+	i := 0
+	return readFullyQualifiedNullable(&data, &i, true)
 }

@@ -34,7 +34,7 @@ import (
 	"testing"
 	"time"
 
-	gremlingo "github.com/apache/tinkerpop/gremlin-go/v3/driver"
+	gremlingo "github.com/balkanid/tinkerpop/gremlin-go/v3/driver"
 	"github.com/cucumber/godog"
 )
 

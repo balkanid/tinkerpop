@@ -624,40 +624,12 @@ func textPWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphB
 	return buffer.Bytes(), err
 }
 
-// customTypeWriter is a placeholder for custom type serialization.
-// Custom types are handled specially in the write() function via the codec registry.
+// customTypeWriter is the registered serializer entry for customType. It is only
+// reached if a custom value is written value-only (without a type code); the
+// fully-qualified path in write() handles custom types directly via the codec
+// registry and never calls this. Writing a custom type value-only is unsupported.
 func customTypeWriter(value interface{}, buffer *bytes.Buffer, typeSerializer *graphBinaryTypeSerializer) ([]byte, error) {
-	// This should not be called - custom types are handled in write() via the codec registry
 	return nil, newError(err0407GetSerializerToWriteUnknownTypeError, "customType")
-}
-
-// writeCustomTypeValues writes custom type values using registered codecs.
-// This function is called by the codec Write method through the WriteContext.
-func (serializer *graphBinaryTypeSerializer) writeCustomTypeValue(value interface{}, buffer *bytes.Buffer) error {
-	writer, _, err := serializer.getSerializerToWrite(value)
-	if err != nil {
-		return err
-	}
-	_, err = serializer.writeType(value, buffer, writer)
-	return err
-}
-
-// writeCustomTypeValueNullable writes custom type values with nullable support.
-func (serializer *graphBinaryTypeSerializer) writeCustomTypeValueNullable(value interface{}, buffer *bytes.Buffer, nullable bool) error {
-	if value == nil {
-		if !nullable {
-			serializer.logHandler.log(Error, unexpectedNull)
-			return newError(err0403WriteValueUnexpectedNullError)
-		}
-		serializer.writeValueFlagNull(buffer)
-		return nil
-	}
-	writer, _, err := serializer.getSerializerToWrite(value)
-	if err != nil {
-		return err
-	}
-	_, err = serializer.writeTypeValue(value, buffer, writer, nullable)
-	return err
 }
 
 // Format: {key}{value}
@@ -851,8 +823,9 @@ func (serializer *graphBinaryTypeSerializer) write(valueObject interface{}, buff
 			return nil, err
 		}
 
-		// Write custom type code again (as per GraphBinary spec for custom types)
-		buffer.WriteByte(byte(customType))
+		// Write the value_flag. write() is only reached for non-nil values
+		// (nil is handled above), so the custom value is always present here.
+		buffer.WriteByte(valueFlagNone)
 
 		// Call the codec's Write method
 		ctx := writeContextForSerializer(serializer)
@@ -1427,13 +1400,21 @@ func readUnqualified(data *[]byte, i *int, dataTyp dataType, nullable bool) (int
 }
 
 func readFullyQualifiedNullable(data *[]byte, i *int, nullable bool) (interface{}, error) {
+	// Guard the type-code and value-flag reads so a truncated frame returns an
+	// error instead of panicking. Only triggers on already-malformed input.
+	if *i >= len(*data) {
+		return nil, fmt.Errorf("graphbinary: unexpected end of data while reading type code")
+	}
 	dataTyp := readDataType(data, i)
 	if dataTyp == nullType {
-		if readByteSafe(data, i) != valueFlagNull {
+		if *i >= len(*data) || readByteSafe(data, i) != valueFlagNull {
 			return nil, newError(err0404ReadNullTypeError)
 		}
 		return nil, nil
 	} else if nullable {
+		if *i >= len(*data) {
+			return nil, fmt.Errorf("graphbinary: unexpected end of data while reading value flag")
+		}
 		if readByteSafe(data, i) == valueFlagNull {
 			return getDefaultValue(dataTyp), nil
 		}
@@ -1446,35 +1427,48 @@ func readFullyQualifiedNullable(data *[]byte, i *int, nullable bool) (interface{
 	return deserializer(data, i)
 }
 
-// Custom type format (JanusGraph-specific):
-// {custom_type_code}{type_name_length}{type_name}{type_id}{custom_type_code}{...specific_data...}
-// Note: When called from readFullyQualifiedNullable, the type code and value flag have been read.
-// The value flag "read" is actually the first byte of type_name_length, so we go back 1 byte.
+// Custom type format:
+// {type_name_length}{type_name}{type_id}{value_flag}{...type_specific_data...}
+// (the leading custom_type_code 0x00 is consumed by readDataType before this).
+//
+// readFullyQualifiedNullable consumes the type code and then, for a nullable
+// read, one more byte to test for a null value. For custom types that extra
+// byte is the first byte of type_name_length, so we rewind 1 byte here.
 func customTypeReader(data *[]byte, i *int) (interface{}, error) {
-	// Go back 1 byte to re-read from the type name length
+	// Go back 1 byte to re-read from the type name length.
 	*i = *i - 1
 
-	// Read type name length (int32)
-	typeNameLen := readIntSafe(data, i)
-	typeName := string((*data)[*i : *i+int(typeNameLen)])
-	*i += int(typeNameLen)
+	// Read type name length (int32) and type name, with bounds checks so a
+	// malformed/truncated frame returns an error instead of panicking.
+	if *i < 0 || *i+4 > len(*data) {
+		return nil, fmt.Errorf("custom type: not enough bytes for type name length")
+	}
+	typeNameLen := int(readIntSafe(data, i))
+	if typeNameLen < 0 || *i+typeNameLen > len(*data) {
+		return nil, fmt.Errorf("custom type: invalid type name length %d", typeNameLen)
+	}
+	typeName := string((*data)[*i : *i+typeNameLen])
+	*i += typeNameLen
 
-	// Read type ID (uint32)
+	// Read type ID (uint32) and value_flag.
+	if *i+5 > len(*data) {
+		return nil, fmt.Errorf("custom type %q: not enough bytes for type id and value flag", typeName)
+	}
 	typeID := binary.BigEndian.Uint32(*readTemp(data, i, 4))
 
-	// Read second custom type code
-	secondCode := readByteSafe(data, i)
-	if secondCode != byte(customType) {
-		return nil, newError(err0408GetSerializerToReadUnknownTypeError, secondCode)
+	valueFlag := readByteSafe(data, i)
+	if valueFlag == valueFlagNull {
+		return nil, nil
+	}
+	if valueFlag != valueFlagNone {
+		return nil, newError(err0408GetSerializerToReadUnknownTypeError, valueFlag)
 	}
 
-	// Dispatch based on type ID using the registry
+	// Dispatch based on type ID using the registry.
 	codec := globalCustomTypeRegistry.GetCodecByID(typeID)
 	if codec == nil {
 		return nil, newError(err0409GetSerializerToReadUnknownCustomTypeError, typeName)
 	}
 
-	// Create a read context and call the codec's Read method
-	ctx := &customTypeReadContext{}
-	return codec.Read(data, i, ctx)
+	return codec.Read(data, i, &customTypeReadContext{})
 }

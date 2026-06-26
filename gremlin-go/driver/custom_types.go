@@ -89,8 +89,8 @@ type ReadContext interface {
 	// ReadString reads a GraphBinary string
 	ReadString(data *[]byte, i *int) (string, error)
 
-	// ReadByte reads a single byte
-	ReadByte(data *[]byte, i *int) (byte, error)
+	// ReadByteValue reads a single byte
+	ReadByteValue(data *[]byte, i *int) (byte, error)
 
 	// ReadBytes reads n bytes
 	ReadBytes(data *[]byte, i *int, n int) ([]byte, error)
@@ -132,40 +132,54 @@ func (ctx *customTypeWriteContext) WriteString(buffer *bytes.Buffer, value strin
 	return nil
 }
 
-// customTypeReadContext implements ReadContext
-type customTypeReadContext struct {
-	serializer *graphBinaryTypeSerializer
-}
+// customTypeReadContext implements ReadContext. Reads use package-level helpers,
+// so no serializer reference is needed.
+type customTypeReadContext struct{}
 
 func (ctx *customTypeReadContext) ReadFullyQualifiedNullable(data *[]byte, i *int, nullable bool) (interface{}, error) {
 	return readFullyQualifiedNullable(data, i, nullable)
 }
 
 func (ctx *customTypeReadContext) ReadInt32(data *[]byte, i *int) (int32, error) {
-	v := readIntSafe(data, i)
-	return v, nil
+	if *i+4 > len(*data) {
+		return 0, fmt.Errorf("not enough bytes to read int32: need 4, have %d", len(*data)-*i)
+	}
+	return readIntSafe(data, i), nil
 }
 
 func (ctx *customTypeReadContext) ReadInt64(data *[]byte, i *int) (int64, error) {
-	v := readLongSafe(data, i)
-	return v, nil
+	if *i+8 > len(*data) {
+		return 0, fmt.Errorf("not enough bytes to read int64: need 8, have %d", len(*data)-*i)
+	}
+	return readLongSafe(data, i), nil
 }
 
 func (ctx *customTypeReadContext) ReadUInt32(data *[]byte, i *int) (uint32, error) {
+	if *i+4 > len(*data) {
+		return 0, fmt.Errorf("not enough bytes to read uint32: need 4, have %d", len(*data)-*i)
+	}
 	v := binary.BigEndian.Uint32((*data)[*i : *i+4])
 	*i += 4
 	return v, nil
 }
 
 func (ctx *customTypeReadContext) ReadString(data *[]byte, i *int) (string, error) {
-	v, err := readString(data, i)
-	if err != nil {
-		return "", err
+	if *i+4 > len(*data) {
+		return "", fmt.Errorf("not enough bytes to read string length")
 	}
-	return v.(string), nil
+	sz := int(readUint32Safe(data, i))
+	if sz < 0 || *i+sz > len(*data) {
+		return "", fmt.Errorf("invalid string length %d", sz)
+	}
+	s := string((*data)[*i : *i+sz])
+	*i += sz
+	return s, nil
 }
 
-func (ctx *customTypeReadContext) ReadByte(data *[]byte, i *int) (byte, error) {
+func (ctx *customTypeReadContext) ReadByteValue(data *[]byte, i *int) (byte, error) {
+	if *i+1 > len(*data) {
+		return 0, fmt.Errorf("not enough bytes to read byte")
+	}
 	v := readByteSafe(data, i)
 	return v, nil
 }
@@ -209,6 +223,12 @@ func RegisterCustomTypeCodec(codec CustomTypeCodec) error {
 // UnregisterCustomTypeCodec removes a custom type codec by type ID.
 func UnregisterCustomTypeCodec(typeID uint32) {
 	globalCustomTypeRegistry.Unregister(typeID)
+}
+
+// IsCustomTypeRegistered reports whether a codec is registered for the given
+// type ID. Vendor packages can use this to make their registration idempotent.
+func IsCustomTypeRegistered(typeID uint32) bool {
+	return globalCustomTypeRegistry.GetCodecByID(typeID) != nil
 }
 
 // RegisterCustomTranslator registers a translation function for a custom type.
@@ -316,9 +336,4 @@ func (r *CustomTypeRegistry) GetTranslator(goType reflect.Type) func(interface{}
 // writeContextForSerializer creates a WriteContext for a graphBinaryTypeSerializer
 func writeContextForSerializer(s *graphBinaryTypeSerializer) WriteContext {
 	return &customTypeWriteContext{serializer: s}
-}
-
-// readContextForSerializer creates a ReadContext for a graphBinaryTypeSerializer
-func readContextForSerializer(s *graphBinaryTypeSerializer) ReadContext {
-	return &customTypeReadContext{serializer: s}
 }
