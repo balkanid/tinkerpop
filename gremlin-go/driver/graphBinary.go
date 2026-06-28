@@ -1348,7 +1348,7 @@ func metricsReader(data *[]byte, i *int) (interface{}, error) {
 	list := nested.([]interface{})
 	metrics.NestedMetrics = make([]Metrics, len(list))
 	for i, metric := range list {
-		metrics.NestedMetrics[i] = metric.(Metrics)
+		metrics.NestedMetrics[i] = *metric.(*Metrics)
 	}
 
 	return metrics, nil
