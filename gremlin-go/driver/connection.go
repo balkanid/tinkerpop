@@ -39,6 +39,7 @@ type connection struct {
 	protocol   protocol
 	results    *synchronizedMap
 	state      connectionState
+	slowQuery  *slowQueryConfig
 }
 
 type connectionSettings struct {
@@ -51,6 +52,9 @@ type connectionSettings struct {
 	readBufferSize           int
 	writeBufferSize          int
 	enableUserAgentOnConnect bool
+	slowQueryThreshold       time.Duration
+	slowQueryReporter        func(SlowQueryInfo)
+	traversalSource          string
 }
 
 func (connection *connection) errorCallback() {
@@ -84,7 +88,7 @@ func (connection *connection) write(request *request) (ResultSet, error) {
 	connection.logHandler.log(Debug, writeRequest)
 	requestID := request.requestID.String()
 	connection.logHandler.logf(Debug, creatingRequest, requestID)
-	resultSet := newChannelResultSet(requestID, connection.results)
+	resultSet := newChannelResultSetWithSlowQuery(requestID, connection.results, request, connection.slowQuery)
 	connection.results.store(requestID, resultSet)
 	return resultSet, connection.protocol.write(request)
 }
@@ -106,6 +110,11 @@ func createConnection(url string, logHandler *logHandler, connSettings *connecti
 		nil,
 		&synchronizedMap{map[string]ResultSet{}, sync.Mutex{}},
 		initialized,
+		&slowQueryConfig{
+			threshold:       connSettings.slowQueryThreshold,
+			reporter:        connSettings.slowQueryReporter,
+			traversalSource: connSettings.traversalSource,
+		},
 	}
 	logHandler.log(Info, connectConnection)
 	protocol, err := newGremlinServerWSProtocol(logHandler, Gorilla, url, connSettings, conn.results, conn.errorCallback)

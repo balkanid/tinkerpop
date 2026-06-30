@@ -22,6 +22,7 @@ package gremlingo
 import (
 	"reflect"
 	"sync"
+	"time"
 )
 
 const defaultCapacity = 1000
@@ -56,6 +57,13 @@ type channelResultSet struct {
 	waitSignal       chan bool
 	channelMutex     sync.Mutex
 	waitSignalMutex  sync.Mutex
+
+	// Slow-query logging state. Populated only when slow-query logging is
+	// enabled for the connection; otherwise startTime is zero and reporting
+	// is skipped entirely.
+	startTime time.Time
+	req       *request
+	slowQuery *slowQueryConfig
 }
 
 func (channelResultSet *channelResultSet) sendSignal() {
@@ -118,6 +126,10 @@ func (channelResultSet *channelResultSet) Close() {
 		close(channelResultSet.channel)
 		channelResultSet.channelMutex.Unlock()
 		channelResultSet.sendSignal()
+		// Reported after unlocking: the reporter is caller-supplied and must
+		// not run while holding channelMutex. The protocol read loop calls
+		// Close() exactly once on completion (success or server error).
+		channelResultSet.reportIfSlow()
 	}
 }
 
@@ -205,9 +217,55 @@ func (channelResultSet *channelResultSet) addResult(r *Result) {
 }
 
 func newChannelResultSetCapacity(requestID string, container *synchronizedMap, channelSize int) ResultSet {
-	return &channelResultSet{make(chan *Result, channelSize), requestID, container, "", nil, false, nil, nil, sync.Mutex{}, sync.Mutex{}}
+	return &channelResultSet{
+		channel:   make(chan *Result, channelSize),
+		requestID: requestID,
+		container: container,
+	}
 }
 
 func newChannelResultSet(requestID string, container *synchronizedMap) ResultSet {
 	return newChannelResultSetCapacity(requestID, container, defaultCapacity)
+}
+
+// newChannelResultSetWithSlowQuery creates a result set that records its start
+// time and request so a slow execution can be reported when it completes. When
+// slow-query logging is disabled it behaves exactly like newChannelResultSet.
+func newChannelResultSetWithSlowQuery(requestID string, container *synchronizedMap, req *request, sq *slowQueryConfig) ResultSet {
+	rs := newChannelResultSetCapacity(requestID, container, defaultCapacity).(*channelResultSet)
+	if sq.enabled() {
+		rs.req = req
+		rs.slowQuery = sq
+		rs.startTime = time.Now()
+	}
+	return rs
+}
+
+// reportIfSlow measures the elapsed time since the result set was created and,
+// if it exceeds the configured threshold, renders the query and invokes the
+// reporter. The query is rendered (and bytecode translated) only here, so the
+// cost is paid only for queries that are actually slow. It must be called
+// without holding channelMutex, since the reporter is caller-supplied code.
+func (channelResultSet *channelResultSet) reportIfSlow() {
+	if !channelResultSet.slowQuery.enabled() || channelResultSet.startTime.IsZero() {
+		return
+	}
+	elapsed := time.Since(channelResultSet.startTime)
+	if elapsed < channelResultSet.slowQuery.threshold {
+		return
+	}
+	query, tenant := channelResultSet.slowQuery.renderQuery(channelResultSet.req)
+	op := ""
+	if channelResultSet.req != nil {
+		op = channelResultSet.req.op
+	}
+	channelResultSet.slowQuery.reporter(SlowQueryInfo{
+		RequestID: channelResultSet.requestID,
+		Op:        op,
+		Query:     query,
+		Tenant:    tenant,
+		Duration:  elapsed,
+		Threshold: channelResultSet.slowQuery.threshold,
+		Err:       channelResultSet.err,
+	})
 }

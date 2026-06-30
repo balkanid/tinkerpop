@@ -53,6 +53,17 @@ type DriverRemoteConnectionSettings struct {
 	MaximumConcurrentConnections int
 	// Initial amount of instantiated connections. Default: 1
 	InitialConcurrentConnections int
+
+	// SlowQueryThreshold enables slow-query logging when set to a positive
+	// duration. Any traversal or script whose end-to-end execution time meets
+	// or exceeds this threshold is passed to SlowQueryReporter. A zero value
+	// (the default) disables slow-query logging entirely.
+	SlowQueryThreshold time.Duration
+	// SlowQueryReporter is invoked once per slow execution. It is required for
+	// slow-query logging to run; if nil, logging is disabled. The reporter is
+	// called off the result set's lock, but on the protocol read goroutine, so
+	// it should be fast and non-blocking (e.g. emit a log line or metric).
+	SlowQueryReporter func(SlowQueryInfo)
 }
 
 // DriverRemoteConnection is a remote connection.
@@ -109,6 +120,9 @@ func NewDriverRemoteConnection(
 		readBufferSize:           settings.ReadBufferSize,
 		writeBufferSize:          settings.WriteBufferSize,
 		enableUserAgentOnConnect: settings.EnableUserAgentOnConnect,
+		slowQueryThreshold:       settings.SlowQueryThreshold,
+		slowQueryReporter:        settings.SlowQueryReporter,
+		traversalSource:          settings.TraversalSource,
 	}
 
 	logHandler := newLogHandler(settings.Logger, settings.LogVerbosity, settings.Language)
@@ -221,6 +235,8 @@ func (driver *DriverRemoteConnection) CreateSession(sessionId ...string) (*Drive
 		settings.ReadBufferSize = driver.settings.ReadBufferSize
 		settings.WriteBufferSize = driver.settings.WriteBufferSize
 		settings.MaximumConcurrentConnections = driver.settings.MaximumConcurrentConnections
+		settings.SlowQueryThreshold = driver.settings.SlowQueryThreshold
+		settings.SlowQueryReporter = driver.settings.SlowQueryReporter
 	})
 	if err != nil {
 		return nil, err

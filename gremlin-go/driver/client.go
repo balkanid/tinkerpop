@@ -50,6 +50,13 @@ type ClientSettings struct {
 	// Initial amount of instantiated connections. Default: 1
 	InitialConcurrentConnections int
 	EnableUserAgentOnConnect     bool
+
+	// SlowQueryThreshold enables slow-query logging when set to a positive
+	// duration. See DriverRemoteConnectionSettings.SlowQueryThreshold.
+	SlowQueryThreshold time.Duration
+	// SlowQueryReporter is invoked once per slow execution. See
+	// DriverRemoteConnectionSettings.SlowQueryReporter.
+	SlowQueryReporter func(SlowQueryInfo)
 }
 
 // Client is used to connect and interact with a Gremlin-supported server.
@@ -103,6 +110,9 @@ func NewClient(url string, configurations ...func(settings *ClientSettings)) (*C
 		readBufferSize:           settings.ReadBufferSize,
 		writeBufferSize:          settings.WriteBufferSize,
 		enableUserAgentOnConnect: settings.EnableUserAgentOnConnect,
+		slowQueryThreshold:       settings.SlowQueryThreshold,
+		slowQueryReporter:        settings.SlowQueryReporter,
+		traversalSource:          settings.TraversalSource,
 	}
 
 	logHandler := newLogHandler(settings.Logger, settings.LogVerbosity, settings.Language)
