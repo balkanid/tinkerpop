@@ -255,17 +255,20 @@ func (channelResultSet *channelResultSet) reportIfSlow() {
 		return
 	}
 	query, tenant := channelResultSet.slowQuery.renderQuery(channelResultSet.req)
+	query, truncated, queryLength := channelResultSet.slowQuery.truncate(query)
 	op := ""
 	if channelResultSet.req != nil {
 		op = channelResultSet.req.op
 	}
 	channelResultSet.slowQuery.reporter(SlowQueryInfo{
-		RequestID: channelResultSet.requestID,
-		Op:        op,
-		Query:     query,
-		Tenant:    tenant,
-		Duration:  elapsed,
-		Threshold: channelResultSet.slowQuery.threshold,
-		Err:       channelResultSet.err,
+		RequestID:      channelResultSet.requestID,
+		Op:             op,
+		Query:          query,
+		QueryTruncated: truncated,
+		QueryLength:    queryLength,
+		Tenant:         tenant,
+		Duration:       elapsed,
+		Threshold:      channelResultSet.slowQuery.threshold,
+		Err:            channelResultSet.err,
 	})
 }

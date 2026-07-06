@@ -21,6 +21,7 @@ package gremlingo
 
 import (
 	"sync"
+	"time"
 )
 
 type connectionPool interface {
@@ -95,13 +96,31 @@ func (pool *loadBalancingPool) getLeastUsedConnection() (*connection, error) {
 		return newConnection()
 	}
 
-	// Remove connections which are dead and find least used.
+	// Remove connections which are dead or expired-and-idle, and find least used.
 	var leastUsed *connection = nil
+	// leastUsedExpired is a fallback: the least-used connection that is past its max lifetime but still
+	// has in-flight results, so it can't be closed yet. Only used if no fresh connection is available.
+	var leastUsedExpired *connection = nil
 	validConnections := make([]*connection, 0, cap(pool.connections))
+	now := time.Now()
 	for _, connection := range pool.connections {
-		if connection.state == established || connection.state == initialized {
-			validConnections = append(validConnections, connection)
+		if connection.state != established && connection.state != initialized {
+			continue
 		}
+		if connection.state == established && connection.isExpired(now) {
+			if connection.activeResults() == 0 {
+				if err := connection.close(); err != nil {
+					pool.logHandler.logf(Warning, errorClosingConnection, err.Error())
+				}
+				continue
+			}
+			validConnections = append(validConnections, connection)
+			if leastUsedExpired == nil || connection.activeResults() < leastUsedExpired.activeResults() {
+				leastUsedExpired = connection
+			}
+			continue
+		}
+		validConnections = append(validConnections, connection)
 		if connection.state == established {
 			// Set the least used connection.
 			if leastUsed == nil || connection.activeResults() < leastUsed.activeResults() {
@@ -112,8 +131,13 @@ func (pool *loadBalancingPool) getLeastUsedConnection() (*connection, error) {
 	pool.connections = validConnections
 
 	if leastUsed == nil {
-		// If no valid connection is found.
+		// If no fresh valid connection is found.
 		if len(pool.connections) >= cap(pool.connections) {
+			if leastUsedExpired != nil {
+				// Pool is at capacity and every connection is past its lifetime; drain-load the
+				// least-busy one rather than failing the request outright.
+				return leastUsedExpired, nil
+			}
 			// Return error if pool is full and no valid connection was found (should not ever happen).
 			return nil, newError(err0105ConnectionPoolFullButNoneValid)
 		} else {

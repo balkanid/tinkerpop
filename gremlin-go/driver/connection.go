@@ -21,6 +21,7 @@ package gremlingo
 
 import (
 	"crypto/tls"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -34,12 +35,19 @@ const (
 	closedDueToError
 )
 
+// maxLifetimeJitterFactor bounds the +/- jitter applied to a connection's expiresAt, as a fraction of
+// maxConnectionLifetime. Jitter avoids many connections created together (e.g. at pool startup) from all
+// expiring in the same instant and forcing a synchronized reconnect burst.
+const maxLifetimeJitterFactor = 0.2
+
 type connection struct {
 	logHandler *logHandler
 	protocol   protocol
 	results    *synchronizedMap
 	state      connectionState
 	slowQuery  *slowQueryConfig
+	createdAt  time.Time
+	expiresAt  time.Time
 }
 
 type connectionSettings struct {
@@ -54,7 +62,15 @@ type connectionSettings struct {
 	enableUserAgentOnConnect bool
 	slowQueryThreshold       time.Duration
 	slowQueryReporter        func(SlowQueryInfo)
+	slowQueryMaxLength       int
 	traversalSource          string
+	maxConnectionLifetime    time.Duration
+}
+
+// isExpired reports whether the connection has passed its max lifetime. A connection with a zero-value
+// expiresAt (maxConnectionLifetime disabled) never expires.
+func (connection *connection) isExpired(now time.Time) bool {
+	return !connection.expiresAt.IsZero() && now.After(connection.expiresAt)
 }
 
 func (connection *connection) errorCallback() {
@@ -105,6 +121,7 @@ func (connection *connection) activeResults() int {
 //	closed: connection was closed by the user.
 //	closedDueToError: connection was closed internally due to an error.
 func createConnection(url string, logHandler *logHandler, connSettings *connectionSettings) (*connection, error) {
+	now := time.Now()
 	conn := &connection{
 		logHandler,
 		nil,
@@ -113,8 +130,16 @@ func createConnection(url string, logHandler *logHandler, connSettings *connecti
 		&slowQueryConfig{
 			threshold:       connSettings.slowQueryThreshold,
 			reporter:        connSettings.slowQueryReporter,
+			maxQueryLength:  connSettings.slowQueryMaxLength,
 			traversalSource: connSettings.traversalSource,
 		},
+		now,
+		time.Time{},
+	}
+	if connSettings.maxConnectionLifetime > 0 {
+		jitterRange := float64(connSettings.maxConnectionLifetime) * maxLifetimeJitterFactor
+		jitter := time.Duration(rand.Float64()*2*jitterRange - jitterRange)
+		conn.expiresAt = now.Add(connSettings.maxConnectionLifetime + jitter)
 	}
 	logHandler.log(Info, connectConnection)
 	protocol, err := newGremlinServerWSProtocol(logHandler, Gorilla, url, connSettings, conn.results, conn.errorCallback)

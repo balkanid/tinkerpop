@@ -57,6 +57,9 @@ type ClientSettings struct {
 	// SlowQueryReporter is invoked once per slow execution. See
 	// DriverRemoteConnectionSettings.SlowQueryReporter.
 	SlowQueryReporter func(SlowQueryInfo)
+	// SlowQueryMaxLength caps the query string passed to SlowQueryReporter, in
+	// bytes. See DriverRemoteConnectionSettings.SlowQueryMaxLength.
+	SlowQueryMaxLength int
 }
 
 // Client is used to connect and interact with a Gremlin-supported server.
@@ -112,6 +115,7 @@ func NewClient(url string, configurations ...func(settings *ClientSettings)) (*C
 		enableUserAgentOnConnect: settings.EnableUserAgentOnConnect,
 		slowQueryThreshold:       settings.SlowQueryThreshold,
 		slowQueryReporter:        settings.SlowQueryReporter,
+		slowQueryMaxLength:       settings.SlowQueryMaxLength,
 		traversalSource:          settings.TraversalSource,
 	}
 

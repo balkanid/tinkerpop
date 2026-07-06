@@ -19,7 +19,11 @@ under the License.
 
 package gremlingo
 
-import "time"
+import (
+	"fmt"
+	"time"
+	"unicode/utf8"
+)
 
 // SlowQueryInfo describes a single traversal or script execution that exceeded
 // the configured slow-query threshold. It is passed to a SlowQueryReporter so
@@ -31,7 +35,13 @@ type SlowQueryInfo struct {
 	Op string
 	// Query is the rendered Gremlin. For bytecode it is translated lazily and
 	// only when the query is slow, so translation cost is never on the fast path.
+	// It is capped at the configured SlowQueryMaxLength; see QueryTruncated.
 	Query string
+	// QueryTruncated is true when Query was cut down from its original length
+	// because it exceeded the configured SlowQueryMaxLength.
+	QueryTruncated bool
+	// QueryLength is the byte length of the rendered query before truncation.
+	QueryLength int
 	// Tenant is the PartitionStrategy writePartition, when present on the query.
 	Tenant string
 	// Duration is the measured wall-clock time from submit to completion.
@@ -49,6 +59,10 @@ type slowQueryConfig struct {
 	threshold       time.Duration
 	reporter        func(SlowQueryInfo)
 	traversalSource string
+	// maxQueryLength caps the rendered query string passed to the reporter, in
+	// bytes. A non-positive value disables truncation (the default), so
+	// existing callers are unaffected until they opt in.
+	maxQueryLength int
 }
 
 // enabled reports whether slow-query logging should run. A nil config, a
@@ -82,6 +96,22 @@ func (c *slowQueryConfig) renderQuery(req *request) (query, tenant string) {
 	default:
 		return "", ""
 	}
+}
+
+// truncate caps query at maxQueryLength bytes, trimming back further if needed
+// to avoid splitting a multi-byte UTF-8 rune at the cut point. It reports
+// whether truncation occurred and the original (pre-truncation) byte length,
+// so callers can log both the shortened query and how much was cut.
+func (c *slowQueryConfig) truncate(query string) (result string, truncated bool, originalLength int) {
+	originalLength = len(query)
+	if c.maxQueryLength <= 0 || originalLength <= c.maxQueryLength {
+		return query, false, originalLength
+	}
+	cut := query[:c.maxQueryLength]
+	for len(cut) > 0 && !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	return fmt.Sprintf("%s...[truncated, %d bytes total]", cut, originalLength), true, originalLength
 }
 
 // extractWritePartition pulls the PartitionStrategy writePartition out of the

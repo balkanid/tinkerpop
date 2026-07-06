@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Arbitrarily high value to use to not trigger creation of new connections
@@ -101,6 +102,53 @@ func TestConnectionPool(t *testing.T) {
 				connection, err := pool.getLeastUsedConnection()
 				assert.Nil(t, err)
 				assert.Equal(t, mockConnection, connection)
+				assert.Len(t, pool.connections, 1)
+			})
+
+			t.Run("expired idle connections are closed and removed", func(t *testing.T) {
+				pool := getPoolForTesting()
+				defer pool.close()
+				expiredIdle := getMockConnection()
+				expiredIdle.expiresAt = time.Now().Add(-time.Second)
+				fresh := getMockConnection()
+				fresh.results.internalMap = smallMap
+				pool.connections = []*connection{expiredIdle, fresh}
+
+				connection, err := pool.getLeastUsedConnection()
+				assert.Nil(t, err)
+				assert.Equal(t, fresh, connection)
+				assert.Equal(t, closed, expiredIdle.state)
+				assert.Len(t, pool.connections, 1)
+			})
+
+			t.Run("expired busy connections are drained as a last resort, not chosen while capacity remains", func(t *testing.T) {
+				pool := getPoolForTesting()
+				pool.connections = make([]*connection, 0, 1)
+				defer pool.close()
+				expiredBusy := getMockConnection()
+				expiredBusy.expiresAt = time.Now().Add(-time.Second)
+				expiredBusy.results.internalMap = smallMap
+				pool.connections = append(pool.connections, expiredBusy)
+
+				// Pool is at capacity (cap 1) and the only connection is expired-but-busy, so it must be
+				// returned instead of erroring, letting the caller's in-flight results keep draining.
+				connection, err := pool.getLeastUsedConnection()
+				assert.Nil(t, err)
+				assert.Equal(t, expiredBusy, connection)
+				assert.NotEqual(t, closed, expiredBusy.state)
+				assert.Len(t, pool.connections, 1)
+			})
+
+			t.Run("zero max lifetime never marks a connection expired", func(t *testing.T) {
+				pool := getPoolForTesting()
+				defer pool.close()
+				neverExpires := getMockConnection()
+				neverExpires.results.internalMap = smallMap
+				pool.connections = []*connection{neverExpires}
+
+				connection, err := pool.getLeastUsedConnection()
+				assert.Nil(t, err)
+				assert.Equal(t, neverExpires, connection)
 				assert.Len(t, pool.connections, 1)
 			})
 		})

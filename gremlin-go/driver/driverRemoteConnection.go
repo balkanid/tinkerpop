@@ -53,6 +53,12 @@ type DriverRemoteConnectionSettings struct {
 	MaximumConcurrentConnections int
 	// Initial amount of instantiated connections. Default: 1
 	InitialConcurrentConnections int
+	// MaxConnectionLifetime bounds how long a pooled connection may live before it becomes eligible for
+	// retirement. Retirement only happens once the connection is also idle (no in-flight results) - a
+	// connection past its lifetime with active results is drained, never force-closed mid-request. A
+	// random jitter of +/-20% is applied per-connection to avoid a synchronized reconnect burst across a
+	// pool whose connections were mostly created together. Default: 0, meaning connections never expire.
+	MaxConnectionLifetime time.Duration
 
 	// SlowQueryThreshold enables slow-query logging when set to a positive
 	// duration. Any traversal or script whose end-to-end execution time meets
@@ -64,6 +70,13 @@ type DriverRemoteConnectionSettings struct {
 	// called off the result set's lock, but on the protocol read goroutine, so
 	// it should be fast and non-blocking (e.g. emit a log line or metric).
 	SlowQueryReporter func(SlowQueryInfo)
+	// SlowQueryMaxLength caps the rendered query string passed to
+	// SlowQueryReporter, in bytes. When the rendered query exceeds this length,
+	// it is cut down and SlowQueryInfo.QueryTruncated is set, with
+	// SlowQueryInfo.QueryLength giving the original length. A non-positive
+	// value (the default) disables truncation, so large queries/mutations are
+	// still fully logged unless this is set.
+	SlowQueryMaxLength int
 }
 
 // DriverRemoteConnection is a remote connection.
@@ -105,6 +118,7 @@ func NewDriverRemoteConnection(
 		NewConnectionThreshold:       defaultNewConnectionThreshold,
 		MaximumConcurrentConnections: runtime.NumCPU(),
 		InitialConcurrentConnections: defaultInitialConcurrentConnections,
+		MaxConnectionLifetime:        0,
 	}
 	for _, configuration := range configurations {
 		configuration(settings)
@@ -122,7 +136,9 @@ func NewDriverRemoteConnection(
 		enableUserAgentOnConnect: settings.EnableUserAgentOnConnect,
 		slowQueryThreshold:       settings.SlowQueryThreshold,
 		slowQueryReporter:        settings.SlowQueryReporter,
+		slowQueryMaxLength:       settings.SlowQueryMaxLength,
 		traversalSource:          settings.TraversalSource,
+		maxConnectionLifetime:    settings.MaxConnectionLifetime,
 	}
 
 	logHandler := newLogHandler(settings.Logger, settings.LogVerbosity, settings.Language)
@@ -231,12 +247,14 @@ func (driver *DriverRemoteConnection) CreateSession(sessionId ...string) (*Drive
 		settings.WriteDeadline = driver.settings.WriteDeadline
 		settings.ConnectionTimeout = driver.settings.ConnectionTimeout
 		settings.NewConnectionThreshold = driver.settings.NewConnectionThreshold
+		settings.MaxConnectionLifetime = driver.settings.MaxConnectionLifetime
 		settings.EnableCompression = driver.settings.EnableCompression
 		settings.ReadBufferSize = driver.settings.ReadBufferSize
 		settings.WriteBufferSize = driver.settings.WriteBufferSize
 		settings.MaximumConcurrentConnections = driver.settings.MaximumConcurrentConnections
 		settings.SlowQueryThreshold = driver.settings.SlowQueryThreshold
 		settings.SlowQueryReporter = driver.settings.SlowQueryReporter
+		settings.SlowQueryMaxLength = driver.settings.SlowQueryMaxLength
 	})
 	if err != nil {
 		return nil, err
