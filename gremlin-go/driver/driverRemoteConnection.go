@@ -77,6 +77,14 @@ type DriverRemoteConnectionSettings struct {
 	// value (the default) disables truncation, so large queries/mutations are
 	// still fully logged unless this is set.
 	SlowQueryMaxLength int
+
+	// DisableClose makes Close a no-op on this DriverRemoteConnection. Intended for a
+	// connection a caller shares across many independent request handlers, each of
+	// which follows the usual create-connection/defer-Close lifecycle without knowing
+	// the connection is shared - without this, the first caller to finish would tear
+	// the connection down for everyone else. The connection can still be torn down
+	// deliberately via ForceClose. Default: false.
+	DisableClose bool
 }
 
 // DriverRemoteConnection is a remote connection.
@@ -84,6 +92,7 @@ type DriverRemoteConnection struct {
 	client          *Client
 	spawnedSessions []*DriverRemoteConnection
 	isClosed        bool
+	disableClose    bool
 	settings        *DriverRemoteConnectionSettings
 }
 
@@ -170,12 +179,27 @@ func NewDriverRemoteConnection(
 		session:         settings.session,
 	}
 
-	return &DriverRemoteConnection{client: client, isClosed: false, settings: settings}, nil
+	return &DriverRemoteConnection{client: client, isClosed: false, disableClose: settings.DisableClose, settings: settings}, nil
 }
 
-// Close closes the DriverRemoteConnection.
+// Close closes the DriverRemoteConnection. A no-op if DisableClose was set on the
+// settings this connection was created with - use ForceClose to close it anyway.
 // Errors if any will be logged
 func (driver *DriverRemoteConnection) Close() {
+	if driver.disableClose {
+		return
+	}
+	driver.forceClose()
+}
+
+// ForceClose closes the DriverRemoteConnection unconditionally, ignoring DisableClose.
+// Intended for a connection's true owner (e.g. process shutdown) to tear it down even
+// when it was shared with callers whose own Close calls are no-ops.
+func (driver *DriverRemoteConnection) ForceClose() {
+	driver.forceClose()
+}
+
+func (driver *DriverRemoteConnection) forceClose() {
 	// If DriverRemoteConnection has spawnedSessions then they must be closed as well.
 	if len(driver.spawnedSessions) > 0 {
 		driver.client.logHandler.logf(Debug, closingSpawnedSessions, driver.client.url)

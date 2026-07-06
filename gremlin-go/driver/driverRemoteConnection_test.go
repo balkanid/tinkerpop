@@ -21,10 +21,26 @@ package gremlingo
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// newTestDriverRemoteConnection builds a DriverRemoteConnection around an empty,
+// never-dialed pool so Close/ForceClose semantics can be tested without a live server.
+func newTestDriverRemoteConnection(disableClose bool) *DriverRemoteConnection {
+	pool := &loadBalancingPool{
+		logHandler:             logger,
+		newConnectionThreshold: newConnectionThreshold,
+		loadBalanceLock:        sync.Mutex{},
+	}
+	client := &Client{
+		logHandler:  logger,
+		connections: pool,
+	}
+	return &DriverRemoteConnection{client: client, disableClose: disableClose}
+}
 
 func TestAuthentication(t *testing.T) {
 
@@ -43,5 +59,25 @@ func TestAuthentication(t *testing.T) {
 		httpHeader := http.Header{}
 		header = &AuthInfo{Header: httpHeader}
 		assert.Equal(t, httpHeader, header.GetHeader())
+	})
+}
+
+func TestDriverRemoteConnectionClose(t *testing.T) {
+	t.Run("Close closes a connection with DisableClose unset", func(t *testing.T) {
+		driver := newTestDriverRemoteConnection(false)
+		driver.Close()
+		assert.True(t, driver.isClosed)
+	})
+
+	t.Run("Close is a no-op when DisableClose is set", func(t *testing.T) {
+		driver := newTestDriverRemoteConnection(true)
+		driver.Close()
+		assert.False(t, driver.isClosed)
+	})
+
+	t.Run("ForceClose closes a connection even when DisableClose is set", func(t *testing.T) {
+		driver := newTestDriverRemoteConnection(true)
+		driver.ForceClose()
+		assert.True(t, driver.isClosed)
 	})
 }
