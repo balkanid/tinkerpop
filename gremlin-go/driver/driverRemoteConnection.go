@@ -60,6 +60,12 @@ type DriverRemoteConnectionSettings struct {
 	// pool whose connections were mostly created together. Default: 0, meaning connections never expire.
 	MaxConnectionLifetime time.Duration
 
+	// LogPoolExpiration turns on dedicated logging (at Info verbosity) for connection
+	// pool lifetime events: a connection exceeding MaxConnectionLifetime being closed
+	// or drained, and a new connection being created to replace one that expired.
+	// Has no effect if MaxConnectionLifetime is 0. Default: false.
+	LogPoolExpiration bool
+
 	// SlowQueryThreshold enables slow-query logging when set to a positive
 	// duration. Any traversal or script whose end-to-end execution time meets
 	// or exceeds this threshold is passed to SlowQueryReporter. A zero value
@@ -148,6 +154,7 @@ func NewDriverRemoteConnection(
 		slowQueryMaxLength:       settings.SlowQueryMaxLength,
 		traversalSource:          settings.TraversalSource,
 		maxConnectionLifetime:    settings.MaxConnectionLifetime,
+		logPoolExpiration:        settings.LogPoolExpiration,
 	}
 
 	logHandler := newLogHandler(settings.Logger, settings.LogVerbosity, settings.Language)
@@ -272,6 +279,7 @@ func (driver *DriverRemoteConnection) CreateSession(sessionId ...string) (*Drive
 		settings.ConnectionTimeout = driver.settings.ConnectionTimeout
 		settings.NewConnectionThreshold = driver.settings.NewConnectionThreshold
 		settings.MaxConnectionLifetime = driver.settings.MaxConnectionLifetime
+		settings.LogPoolExpiration = driver.settings.LogPoolExpiration
 		settings.EnableCompression = driver.settings.EnableCompression
 		settings.ReadBufferSize = driver.settings.ReadBufferSize
 		settings.WriteBufferSize = driver.settings.WriteBufferSize

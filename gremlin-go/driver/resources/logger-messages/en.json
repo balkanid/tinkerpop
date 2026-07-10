@@ -27,5 +27,8 @@
   "CREATE_CONNECTION_ERROR": "Error creating new connection for connection pool: %s",
   "POOL_NEW_CONNECTION_ERROR": "Falling back to least-used connection. Creating new connection due to least-used connection exceeding concurrent usage threshold failed: %s",
   "SESSION_DETECTED": "Session detected. Setting connection pool size maximum to 1.",
-  "POOL_INITIAL_EXCEEDS_MAXIMUM": "InitialConcurrentConnections setting %d exceeded MaximumConcurrentConnections setting %d - limiting InitialConcurrentConnections to %d."
+  "POOL_INITIAL_EXCEEDS_MAXIMUM": "InitialConcurrentConnections setting %d exceeded MaximumConcurrentConnections setting %d - limiting InitialConcurrentConnections to %d.",
+  "POOL_CONNECTION_EXPIRED_CLOSING": "Pool connection created %s ago exceeded MaxConnectionLifetime; closing idle expired connection.",
+  "POOL_CONNECTION_EXPIRED_DEFERRED": "Pool connection created %s ago exceeded MaxConnectionLifetime but has %d active result(s); deferring close until idle.",
+  "POOL_CONNECTION_EXPIRED_REPLACED": "Creating new pool connection to replace %d expired connection(s) that were closed."
 }

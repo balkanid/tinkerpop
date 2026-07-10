@@ -103,16 +103,24 @@ func (pool *loadBalancingPool) getLeastUsedConnection() (*connection, error) {
 	var leastUsedExpired *connection = nil
 	validConnections := make([]*connection, 0, cap(pool.connections))
 	now := time.Now()
+	expiredClosedCount := 0
 	for _, connection := range pool.connections {
 		if connection.state != established && connection.state != initialized {
 			continue
 		}
 		if connection.state == established && connection.isExpired(now) {
 			if connection.activeResults() == 0 {
+				if pool.connSettings.logPoolExpiration {
+					pool.logHandler.logf(Info, poolConnectionExpiredClosing, now.Sub(connection.createdAt).String())
+				}
 				if err := connection.close(); err != nil {
 					pool.logHandler.logf(Warning, errorClosingConnection, err.Error())
 				}
+				expiredClosedCount++
 				continue
+			}
+			if pool.connSettings.logPoolExpiration {
+				pool.logHandler.logf(Info, poolConnectionExpiredDeferred, now.Sub(connection.createdAt).String(), connection.activeResults())
 			}
 			validConnections = append(validConnections, connection)
 			if leastUsedExpired == nil || connection.activeResults() < leastUsedExpired.activeResults() {
@@ -142,6 +150,9 @@ func (pool *loadBalancingPool) getLeastUsedConnection() (*connection, error) {
 			return nil, newError(err0105ConnectionPoolFullButNoneValid)
 		} else {
 			// Return new connection if no valid connection was found and pool has capacity.
+			if expiredClosedCount > 0 && pool.connSettings.logPoolExpiration {
+				pool.logHandler.logf(Info, poolConnectionExpiredReplaced, expiredClosedCount)
+			}
 			return newConnection()
 		}
 	} else if leastUsed.activeResults() >= pool.newConnectionThreshold && len(pool.connections) < cap(pool.connections) {

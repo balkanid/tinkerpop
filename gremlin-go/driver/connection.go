@@ -65,6 +65,7 @@ type connectionSettings struct {
 	slowQueryMaxLength       int
 	traversalSource          string
 	maxConnectionLifetime    time.Duration
+	logPoolExpiration        bool
 }
 
 // isExpired reports whether the connection has passed its max lifetime. A connection with a zero-value

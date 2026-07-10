@@ -20,9 +20,11 @@ under the License.
 package gremlingo
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +44,35 @@ func getPoolForTesting() *loadBalancingPool {
 		connections:            nil,
 		loadBalanceLock:        sync.Mutex{},
 	}
+}
+
+// capturingLogger is a test Logger implementation that records formatted messages for assertions.
+type capturingLogger struct {
+	mu       sync.Mutex
+	messages []string
+}
+
+func (c *capturingLogger) Log(_ LogVerbosity, v ...interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.messages = append(c.messages, fmt.Sprint(v...))
+}
+
+func (c *capturingLogger) Logf(_ LogVerbosity, format string, v ...interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.messages = append(c.messages, fmt.Sprintf(format, v...))
+}
+
+func (c *capturingLogger) contains(substr string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, m := range c.messages {
+		if strings.Contains(m, substr) {
+			return true
+		}
+	}
+	return false
 }
 
 func getMockConnection() *connection {
@@ -137,6 +168,55 @@ func TestConnectionPool(t *testing.T) {
 				assert.Equal(t, expiredBusy, connection)
 				assert.NotEqual(t, closed, expiredBusy.state)
 				assert.Len(t, pool.connections, 1)
+			})
+
+			t.Run("expired idle connection logs an event when LogPoolExpiration is enabled", func(t *testing.T) {
+				captured := &capturingLogger{}
+				pool := getPoolForTesting()
+				pool.logHandler = newLogHandler(captured, Info, language.English)
+				pool.connSettings.logPoolExpiration = true
+				defer pool.close()
+				expiredIdle := getMockConnection()
+				expiredIdle.expiresAt = time.Now().Add(-time.Second)
+				fresh := getMockConnection()
+				fresh.results.internalMap = smallMap
+				pool.connections = []*connection{expiredIdle, fresh}
+
+				_, err := pool.getLeastUsedConnection()
+				assert.Nil(t, err)
+				assert.True(t, captured.contains("exceeded MaxConnectionLifetime"))
+			})
+
+			t.Run("expired idle connection logs nothing when LogPoolExpiration is disabled", func(t *testing.T) {
+				captured := &capturingLogger{}
+				pool := getPoolForTesting()
+				pool.logHandler = newLogHandler(captured, Info, language.English)
+				defer pool.close()
+				expiredIdle := getMockConnection()
+				expiredIdle.expiresAt = time.Now().Add(-time.Second)
+				fresh := getMockConnection()
+				fresh.results.internalMap = smallMap
+				pool.connections = []*connection{expiredIdle, fresh}
+
+				_, err := pool.getLeastUsedConnection()
+				assert.Nil(t, err)
+				assert.False(t, captured.contains("exceeded MaxConnectionLifetime"))
+			})
+
+			t.Run("replacing an expired connection logs a replacement event when LogPoolExpiration is enabled", func(t *testing.T) {
+				captured := &capturingLogger{}
+				pool := getPoolForTesting()
+				pool.logHandler = newLogHandler(captured, Info, language.English)
+				pool.connSettings.logPoolExpiration = true
+				defer pool.close()
+				expiredIdle := getMockConnection()
+				expiredIdle.expiresAt = time.Now().Add(-time.Second)
+				pool.connections = []*connection{expiredIdle}
+
+				// The attempted replacement connection will fail to dial (no real server at the empty
+				// test URL), but the replacement log line is emitted before that dial is attempted.
+				_, _ = pool.getLeastUsedConnection()
+				assert.True(t, captured.contains("Creating new pool connection to replace"))
 			})
 
 			t.Run("zero max lifetime never marks a connection expired", func(t *testing.T) {
