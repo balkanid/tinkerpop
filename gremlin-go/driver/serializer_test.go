@@ -61,6 +61,18 @@ func TestSerializer(t *testing.T) {
 		assert.Equal(t, []interface{}{int64(0)}, response.responseResult.data)
 	})
 
+	t.Run("test serialized response message with status code >= 256", func(t *testing.T) {
+		// Same fixture as "test serialized response message" above, with the status code
+		// bytes changed from 0,0,0,200 to 0,0,1,173 (429, TOO_MANY_REQUESTS). Regression test
+		// for a bug where responseStatus.code was masked with & 0xFF, truncating any status
+		// code >= 256 down to its low byte (e.g. 429 became 173, 500 became 244).
+		responseByteArray := []byte{129, 0, 251, 37, 42, 74, 117, 221, 71, 191, 183, 78, 86, 53, 0, 12, 132, 100, 0, 0, 1, 173, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 4, 104, 111, 115, 116, 3, 0, 0, 0, 0, 16, 47, 49, 50, 55, 46, 48, 46, 48, 46, 49, 58, 54, 50, 48, 51, 53, 0, 0, 0, 0, 9, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		serializer := newGraphBinarySerializer(newLogHandler(&defaultLogger{}, Error, language.English))
+		response, err := serializer.deserializeMessage(responseByteArray)
+		assert.Nil(t, err)
+		assert.Equal(t, uint16(429), response.responseStatus.code)
+	})
+
 	t.Run("test serialized response message w/ custom type error handling", func(t *testing.T) {
 		// Use a custom type ID that doesn't exist (0x9999 is not registered)
 		// The byte array below contains type name "janusgraph.Unknown" with type ID 0x9999

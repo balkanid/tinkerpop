@@ -193,7 +193,7 @@ func (gs graphBinarySerializer) deserializeMessage(message []byte) (response, er
 		return msg, err
 	}
 	msg.responseID = id.(uuid.UUID)
-	msg.responseStatus.code = uint16(readUint32Safe(&message, &i) & 0xFF)
+	msg.responseStatus.code = uint16(readUint32Safe(&message, &i))
 	isMessageValid := readByteSafe(&message, &i)
 	if isMessageValid == 0 {
 		message, err := readString(&message, &i)
