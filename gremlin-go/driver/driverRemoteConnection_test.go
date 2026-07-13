@@ -80,4 +80,13 @@ func TestDriverRemoteConnectionClose(t *testing.T) {
 		driver.ForceClose()
 		assert.True(t, driver.isClosed)
 	})
+
+	t.Run("IsClosed is false until Close/ForceClose", func(t *testing.T) {
+		driver := newTestDriverRemoteConnection(true)
+		assert.False(t, driver.IsClosed())
+		driver.Close()
+		assert.False(t, driver.IsClosed()) // DisableClose makes Close a no-op
+		driver.ForceClose()
+		assert.True(t, driver.IsClosed())
+	})
 }

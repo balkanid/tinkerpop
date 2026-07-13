@@ -206,6 +206,12 @@ func (driver *DriverRemoteConnection) ForceClose() {
 	driver.forceClose()
 }
 
+// IsClosed reports whether this DriverRemoteConnection has been closed via Close or
+// ForceClose. Used by shared-connection owners to decide when to dial a replacement.
+func (driver *DriverRemoteConnection) IsClosed() bool {
+	return driver.isClosed
+}
+
 func (driver *DriverRemoteConnection) forceClose() {
 	// If DriverRemoteConnection has spawnedSessions then they must be closed as well.
 	if len(driver.spawnedSessions) > 0 {
